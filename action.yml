@@ -1,0 +1,39 @@
+name: 'UploadToGithubRelease'
+description: 'Github Action to deploy files to github release'
+author: 'owent'
+inputs:
+  file:
+    description: 'The files or file patterns to upload. You can upload multiple files by split them by semicolon. You can use the glob pattern to find the files.'
+    required: true
+    default: ''
+  overwrite:
+    description: "If you need to overwrite existing files, add overwrite: true to the with."
+    required: false
+    default: false
+  draft:
+    description: 'The resultant deployment is a draft Release that only repository collaborators can see. This gives you an opportunity to examine and edit the draft release.'
+    required: false
+    default: true
+  tags:
+    description: 'With tags: true, your Releases deployment will trigger if and only if the build is a tagged build.'
+    required: false
+    default: false
+  branches:
+    description: 'Only work on these branches(splited by semicolon), set to nothing to accept all branches.'
+    required: false
+    default: ''
+  
+outputs:
+  time: # id of output
+    description: 'The time we greeted you'
+
+runs:
+  using: 'node12'
+  main: 'lib/index.js'
+
+# env:
+#   key: value  
+
+branding:
+  icon: 'upload'  
+  color: 'gray-dark'

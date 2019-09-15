@@ -33,6 +33,7 @@ bower_components
 build/Release
 
 # Dependency directories
+# github action need node_modules or use zeit/ncc to build a package entrypoint file
 node_modules/
 jspm_packages/
 

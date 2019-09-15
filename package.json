@@ -1,0 +1,40 @@
+{
+  "name": "upload-to-github-release",
+  "version": "0.1.0",
+  "description": "Github Action to deploy files to github release",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xresloader/upload-to-github-release.git"
+  },
+  "keywords": [
+    "github",
+    "action",
+    "asset",
+    "release",
+    "upload"
+  ],
+  "author": "owent",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xresloader/upload-to-github-release/issues"
+  },
+  "homepage": "https://github.com/xresloader/upload-to-github-release#readme",
+  "dependencies": {
+    "@actions/core": "^1.1.0",
+    "@actions/github": "^1.1.0",
+    "globby": "^10.0.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.18",
+    "@types/node": "^12.7.5",
+    "jest": "^24.9.0",
+    "jest-circus": "^24.9.0",
+    "ts-jest": "^24.1.0",
+    "typescript": "^3.6.3"
+  }
+}
