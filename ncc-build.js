@@ -1,7 +1,8 @@
 const path = require('path');
 const fs = require('fs');
+const ncc = require('@zeit/ncc');
 
-require('@zeit/ncc')(path.join(__dirname, 'src', 'index.ts'), {
+ncc(path.join(__dirname, 'src', 'index.ts'), {
     // provide a custom cache path or disable caching
     cache: false,
     // externals to leave as requires of the build
@@ -13,7 +14,7 @@ require('@zeit/ncc')(path.join(__dirname, 'src', 'index.ts'), {
     sourceMapBasePrefix: '', // default treats sources as output-relative
     // when outputting a sourcemap, automatically include
     // source-map-support in the output file (increases output by 32kB).
-    sourceMapRegister: true, // default
+    sourceMapRegister: false, // default
     watch: false, // default
     v8cache: false, // default
     quiet: false, // default
