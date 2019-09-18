@@ -97,6 +97,8 @@ async function run() {
 
         // request github release
         const octokit = new action_github.GitHub(github_token);
+        /** Can not upload assets by v4 API, so we use v3 API by now **/
+        /**
         // Debug Tool: https://developer.github.com/v4/explorer
         // API Docs:   https://developer.github.com/v4/
         const repo_info = await octokit.graphql(`query {
@@ -154,20 +156,11 @@ async function run() {
         console.log("============================= v4 API: graphql(query {repository}) =============================");
         console.log(`repo_info = ${JSON.stringify(repo_info)}`);
         console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
+        **/
         // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
-        var check_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>|undefined = undefined;
+        var deploy_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>|undefined = undefined;
         try {
-            check_release = await octokit.repos.getReleaseByTag({
-                owner: "xresloader",
-                repo: "xresloader",
-                tag: "v2.5.0"
-            });
-        } catch (error) {
-            console.log(`${error.message}`);
-        }
-        var old_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>|undefined = undefined;
-        try {
-            old_release = await octokit.repos.getReleaseByTag({
+            deploy_release = await octokit.repos.getReleaseByTag({
                 owner: action_github.context.repo.owner,
                 repo: action_github.context.repo.repo,
                 tag: release_name
@@ -177,27 +170,23 @@ async function run() {
         }
 
         console.log("============================= v3 API: getReleaseByTag =============================");
-        if (check_release) {
-            console.log(`xresloader.getReleaseByTag.status = ${check_release.status}  -- ${check_release.headers.status}`);
-            console.log(`xresloader.getReleaseByTag.data = ${JSON.stringify(check_release.data)}`);
-        }
-
-        if (old_release) {
-            console.log(`${action_github.context.repo.repo}.getReleaseByTag.status = ${old_release.status}  -- ${old_release.headers.status}`);
-            console.log(`${action_github.context.repo.repo}.getReleaseByTag.data = ${JSON.stringify(old_release.data)}`);
+        if (deploy_release && deploy_release.headers) {
+            console.log(`Try to get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status}`);
+            // console.log(`${action_github.context.repo.repo}.getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`);
         }
 
 
         const pending_to_delete : any[] = [];
         const pending_to_upload : string[] = [];
-        var upload_url = old_release?old_release.data.upload_url: "";
-        var release_url = old_release?old_release.data.url: "";
-        var release_tag_name = old_release?old_release.data.tag_name: "";
-        var release_commitish = old_release?old_release.data.target_commitish: "";
+        var upload_url = deploy_release?deploy_release.data.upload_url: "";
+        var release_url = deploy_release?deploy_release.data.url: "";
+        var release_tag_name = deploy_release?deploy_release.data.tag_name: "";
+        var release_commitish = deploy_release?deploy_release.data.target_commitish: "";
         // https://developer.github.com/v3/repos/releases/#create-a-release
-        if (false /* release not found */) {
+        if (!deploy_release) {
             try {
-                const new_release = await octokit.repos.createRelease({
+                console.log(`Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                deploy_release = await octokit.repos.createRelease({
                     owner: action_github.context.repo.owner,
                     repo: action_github.context.repo.repo,
                     tag_name: release_name,
@@ -207,10 +196,10 @@ async function run() {
                     draft: is_draft,
                     prerelease: is_prerelease
                 });
-                upload_url = new_release.data.upload_url;
-                release_url = new_release.data.url;
-                release_tag_name = new_release.data.tag_name;
-                release_commitish = new_release.data.target_commitish;
+                upload_url = deploy_release.data.upload_url;
+                release_url = deploy_release.data.url;
+                release_tag_name = deploy_release.data.tag_name;
+                release_commitish = deploy_release.data.target_commitish;
             } catch (error) {
                 var msg = `Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
                 msg += `\r\n${error.stack}`;
@@ -219,9 +208,9 @@ async function run() {
             }
         }
         
-        if (old_release && old_release.data && old_release.data.assets) {
+        if (deploy_release && deploy_release.data && deploy_release.data.assets) {
             const old_asset_map = {};
-            for (const asset of old_release.data.assets || []) {
+            for (const asset of deploy_release.data.assets || []) {
                 old_asset_map[asset.name] = asset;
             }
 
@@ -287,7 +276,7 @@ async function run() {
             }
         }
 
-        // Environment
+        // Environment sample
         // GITHUB_ACTION=run
         // GITHUB_ACTIONS=true
         // GITHUB_ACTOR=owt5008137
