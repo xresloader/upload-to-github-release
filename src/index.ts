@@ -1,18 +1,35 @@
 import * as action_core from '@actions/core';
 import * as action_github from '@actions/github';
 import globby from 'globby';
+import * as path from 'path';
+import * as fs from 'fs';
+import mime from 'mime/lite';
 
 // const io = require('@actions/io');
 // const tc = require('@actions/tool-cache');
 
+function getInputAsArray(name: string) : string[] {
+    return (action_core.getInput(name) || '').split(";").map(v => v.trim()).filter(v => !!v);
+}
+
+function getInputAsBool(name: string) : boolean {
+    const res = (action_core.getInput(name) || '').toLowerCase();
+    if (!res) {
+        return false;
+    }
+
+    return res != "false" && res != "disabled" && res != "0" && res != "no" && res != "disable";
+}
+
 async function run() {
     try {
         const github_token = (process.env['GITHUB_TOKEN'] || '').trim();
-        const upload_files_pattern = (action_core.getInput('file') || '').split(";").map(v => v.trim()).filter(v => !!v);
+        const upload_files_pattern = getInputAsArray('file');
         const is_overwrite = action_core.getInput('overwrite');
-        const is_draft = action_core.getInput('draft');
-        const with_tags = action_core.getInput('tags');
-        const with_branches = (action_core.getInput('branches') || '').split(";").map(v => v.trim()).filter(v => !!v);
+        const is_draft = getInputAsBool('draft');
+        const is_prerelease = getInputAsBool('prerelease');
+        const with_tags = getInputAsBool('tags');
+        const with_branches = getInputAsArray('branches');
 
         if (typeof (github_token) != 'string') {
             action_core.setFailed("token is invalid");
@@ -24,25 +41,16 @@ async function run() {
             return;
         }
 
-
-        console.log(`context.payload = ${JSON.stringify(action_github.context.payload, undefined, 2)}`);
-        console.log(`context.eventName = ${action_github.context.eventName}`);
-        console.log(`context.sha = ${action_github.context.sha}`);
+        // action_github.context.eventName = push
+        // action_github.context.sha = ae7dc58d20ad51b3c8c37deca1bc07f3ae8526cd
         // context.ref = refs/heads/BRANCH_NAME  or refs/tags/TAG_NAME   
-        console.log(`context.ref = ${action_github.context.ref}`);
-        console.log(`context.action = ${action_github.context.action}`);
-        console.log(`context.actor = ${action_github.context.actor}`);
-        console.log(`context.repo.repo = ${action_github.context.repo.repo}`);
-        console.log(`context.repo.owner = ${action_github.context.repo.owner}`);
-        // context.eventName = push
-        // context.sha = ae7dc58d20ad51b3c8c37deca1bc07f3ae8526cd
-        // context.ref = refs/heads/master
-        // context.action = xresloaderupload-to-github-release
-        // context.actor = owt5008137
-        // context.repo.repo = upload-to-github-release-test
-        // context.repo.owner = xresloader
+        // action_github.context.ref = refs/heads/master
+        // action_github.context.action = xresloaderupload-to-github-release
+        // action_github.context.actor = owt5008137
+        // action_github.context.repo.repo = upload-to-github-release-test
+        // action_github.context.repo.owner = xresloader
 
-        var release_name = action_github.context.sha.substr(0, 8);
+        var release_name = "Release-" + action_github.context.sha.substr(0, 8);
         if (with_branches || with_tags) {
             // check branches or tags
             var match_filter = false;
@@ -62,7 +70,7 @@ async function run() {
                     const selected_branch = with_branches.filter((s) => s == match_branch[1]);
                     if (selected_branch) {
                         match_filter = true;
-                        release_name = match_branch[1] + '-' + release_name;
+                        release_name = match_branch[1] + '-' + action_github.context.sha.substr(0, 8);
                     }
                 }
 
@@ -78,15 +86,18 @@ async function run() {
         }
 
         const upload_files = await globby(upload_files_pattern);
-        console.log(`Files to upload: ${upload_files}!`);
         if (!upload_files) {
-            action_core.setFailed("file is required");
+            action_core.setFailed(`Can not find any file by ${upload_files_pattern}`);
             return;
+        }
+        for (const file_path of upload_files) {
+            console.log(`File found to upload: ${file_path}`);
         }
 
         // request github release
         const octokit = new action_github.GitHub(github_token);
         // Debug Tool: https://developer.github.com/v4/explorer
+        // API Docs:   https://developer.github.com/v4/
         const repo_info = await octokit.graphql(`query {
                 repository (owner:"xresloader", name:"xresloader") { 
                     release (tagName: "v2.5.0") {
@@ -113,19 +124,142 @@ async function run() {
                 }
             }`);
 
+        const repo_info_of_release = await octokit.graphql(`query {
+                repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") { 
+                    release (tagName: "${release_name}") {
+                    id,
+                    name,
+                    isDraft,
+                    resourcePath,
+                    tag {
+                        id, 
+                        name,
+                        prefix
+                    },
+                    updatedAt,
+                    url,
+                    releaseAssets(last: 5) {
+                        nodes {
+                        id,
+                        name,
+                        size,
+                        downloadUrl
+                        }
+                    }
+                    }
+                }
+            }`);
+
         console.log("============================= v4 API: graphql(query {repository}) =============================");
-        console.log(`repo_info = ${repo_info} => ${JSON.stringify(repo_info)}`);
+        console.log(`repo_info = ${JSON.stringify(repo_info)}`);
+        console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
         // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
         const check_release = await octokit.repos.getReleaseByTag({
             owner: "xresloader",
             repo: "xresloader",
             tag: "v2.5.0"
         });
+        const old_release = await octokit.repos.getReleaseByTag({
+            owner: action_github.context.repo.owner,
+            repo: action_github.context.repo.repo,
+            tag: release_name
+        });
 
         console.log("============================= v3 API: getReleaseByTag =============================");
-        console.log(`getReleaseByTag.headers = ${JSON.stringify(check_release.headers)}`);
-        console.log(`getReleaseByTag.status = ${check_release.status}`);
-        console.log(`getReleaseByTag.data = ${JSON.stringify(check_release.data)}`);
+        console.log(`xresloader.getReleaseByTag.status = ${check_release.status}  -- ${check_release.headers.status}`);
+        console.log(`xresloader.getReleaseByTag.data = ${JSON.stringify(check_release.data)}`);
+        console.log(`${action_github.context.repo.repo}.getReleaseByTag.status = ${old_release.status}  -- ${old_release.headers.status}`);
+        console.log(`${action_github.context.repo.repo}.getReleaseByTag.data = ${JSON.stringify(old_release.data)}`);
+
+
+        const pending_to_delete : any[] = [];
+        const pending_to_upload : string[] = [];
+        var upload_url = old_release.data.upload_url;
+        // https://developer.github.com/v3/repos/releases/#create-a-release
+        if (false /* release not found */) {
+            const new_release = await octokit.repos.createRelease({
+                owner: action_github.context.repo.owner,
+                repo: action_github.context.repo.repo,
+                tag_name: release_name,
+                target_commitish: action_github.context.sha,
+                name: release_name,
+                // body: "",
+                draft: is_draft,
+                prerelease: is_prerelease
+            });
+            upload_url = new_release.data.upload_url;
+        }
+        
+        if (old_release && old_release.data && old_release.data.assets) {
+            const old_asset_map = {};
+            for (const asset of old_release.data.assets || []) {
+                old_asset_map[asset.name] = asset;
+            }
+
+            for (const file_path of upload_files) {
+                const file_base_name = path.basename(file_path);
+                if (old_asset_map[file_base_name]) {
+                    if (is_overwrite) {
+                        pending_to_delete.push(old_asset_map[file_base_name]);
+                        pending_to_upload.push(file_path);
+                    } else {
+                        console.log(`File ${file_base_name} is already exists, skip this file.`);
+                    }
+                } else {
+                    pending_to_upload.push(file_path);
+                }
+            }
+        }
+
+        // Delete old assets.
+        for (const asset of pending_to_delete) {
+            // const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
+            console.log(`Deleting old asset: ${asset.name} ...`);
+            const delete_rsp = await octokit.repos.deleteReleaseAsset({
+                owner: action_github.context.repo.owner,
+                repo: action_github.context.repo.repo,
+                asset_id: asset.id
+            });
+            console.log(`Delete old asset: ${asset.name} => ${delete_rsp.headers.status}`);
+        }
+
+        // Upload new assets
+        for (const file_path of pending_to_upload) {
+            console.log(`Uploading asset: ${file_path} ...`);
+            const find_mime = mime.getType(path.extname(file_path));
+            const file_base_name = path.basename(file_path);
+            const upload_rsp = await octokit.repos.uploadReleaseAsset({
+                url: upload_url,
+                headers: {
+                    "content-type": find_mime || "application/octet-stream",
+                    "content-length": fs.statSync(file_path).size
+                },
+                name: file_base_name,
+                file: fs.createReadStream(file_path)
+            });
+
+            if (200 != (upload_rsp.status - upload_rsp.status % 100)) {
+                const msg = `Upload asset: ${file_base_name} failed => ${upload_rsp.headers.status}`;
+                console.log(msg);
+                action_core.setFailed(msg);
+            } else {
+                console.log(`Upload asset: ${file_base_name} success => ${upload_rsp.headers.status}`);
+            }
+        }
+
+        // Environment
+        // GITHUB_ACTION=run
+        // GITHUB_ACTIONS=true
+        // GITHUB_ACTOR=owt5008137
+        // GITHUB_BASE_REF=
+        // GITHUB_EVENT_NAME=push
+        // GITHUB_EVENT_PATH=/home/runner/work/_temp/_github_workflow/event.json
+        // GITHUB_HEAD_REF=
+        // GITHUB_REF=refs/heads/master
+        // GITHUB_REPOSITORY=xresloader/upload-to-github-release-test
+        // GITHUB_SHA=d3e5b42d6fdf7bfab40c5d6d7d51491d0287780f
+        // GITHUB_WORKFLOW=main
+        // GITHUB_WORKSPACE=/home/runner/work/upload-to-github-release-test/upload-to-github-release-test
         // set output
         const time = (new Date()).toTimeString();
         action_core.setOutput("time", time);

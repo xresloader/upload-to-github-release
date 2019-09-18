@@ -40,6 +40,12 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Default** : true
 
+### `prerelease`
+
+**Optional** The resultant deployment is a Prerelease that only repository collaborators can see. This gives you an opportunity to examine and edit the prerelease.
+
+**Default** : false
+
 ### `tags`
 
 **Optional** With tags: true, your Releases deployment will trigger if and only if the build is a tagged build.

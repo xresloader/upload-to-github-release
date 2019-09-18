@@ -14,6 +14,10 @@ inputs:
     description: 'The resultant deployment is a draft Release that only repository collaborators can see. This gives you an opportunity to examine and edit the draft release.'
     required: false
     default: true
+  prerelease:
+    description: 'The resultant deployment is a Prerelease. This gives you an opportunity to examine and edit the prerelease.'
+    required: false
+    default: false
   tags:
     description: 'With tags: true, your Releases deployment will trigger if and only if the build is a tagged build.'
     required: false
