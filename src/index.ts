@@ -158,7 +158,7 @@ async function run() {
         console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
         **/
         // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
-        var deploy_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>|undefined = undefined;
+        var deploy_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>|Octokit.Response<Octokit.ReposCreateReleaseResponse>|undefined = undefined;
         try {
             deploy_release = await octokit.repos.getReleaseByTag({
                 owner: action_github.context.repo.owner,
@@ -200,6 +200,7 @@ async function run() {
                 release_url = deploy_release.data.url;
                 release_tag_name = deploy_release.data.tag_name;
                 release_commitish = deploy_release.data.target_commitish;
+                console.log(`Create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
             } catch (error) {
                 var msg = `Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
                 msg += `\r\n${error.stack}`;
@@ -221,7 +222,7 @@ async function run() {
                         pending_to_delete.push(old_asset_map[file_base_name]);
                         pending_to_upload.push(file_path);
                     } else {
-                        console.log(`File ${file_base_name} is already exists, skip this file.`);
+                        console.log(`Skip asset file: ${file_base_name}, it'salready existed.`);
                     }
                 } else {
                     pending_to_upload.push(file_path);
@@ -267,7 +268,7 @@ async function run() {
                     console.log(msg);
                     action_core.setFailed(msg);
                 } else {
-                    console.log(`Upload asset: ${file_base_name} success => ${upload_rsp.headers.status}`);
+                    console.log(`Upload asset: ${file_base_name} success`);
                 }
             } catch (error) {
                 const msg = `Upload asset: ${file_base_name} failed => ${error.message}\r\n${error.stack}`;
