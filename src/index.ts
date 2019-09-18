@@ -158,7 +158,10 @@ async function run() {
         console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
         **/
         // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
-        var deploy_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>|Octokit.Response<Octokit.ReposCreateReleaseResponse>|undefined = undefined;
+        var deploy_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>
+            | Octokit.Response<Octokit.ReposCreateReleaseResponse>
+            | Octokit.Response<Octokit.ReposUpdateReleaseResponse>
+            | undefined = undefined;
         try {
             deploy_release = await octokit.repos.getReleaseByTag({
                 owner: action_github.context.repo.owner,
@@ -183,7 +186,32 @@ async function run() {
         var release_tag_name = deploy_release?deploy_release.data.tag_name: "";
         var release_commitish = deploy_release?deploy_release.data.target_commitish: "";
         // https://developer.github.com/v3/repos/releases/#create-a-release
-        if (!deploy_release) {
+        if (deploy_release && deploy_release.data) {
+            try {
+                console.log(`Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                deploy_release = await octokit.repos.updateRelease({
+                    owner: action_github.context.repo.owner,
+                    repo: action_github.context.repo.repo,
+                    release_id: deploy_release.data.id,
+                    tag_name: release_name,
+                    target_commitish: action_github.context.sha,
+                    name: release_name,
+                    body: deploy_release.data.body,
+                    draft: is_draft,
+                    prerelease: is_prerelease
+                });
+                upload_url = deploy_release.data.upload_url;
+                release_url = deploy_release.data.url;
+                release_tag_name = deploy_release.data.tag_name;
+                release_commitish = deploy_release.data.target_commitish;
+                console.log(`Update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+            } catch (error) {
+                var msg = `Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+                msg += `\r\n${error.stack}`;
+                console.log(msg);
+                action_core.setFailed(msg);
+            }
+        } else {
             try {
                 console.log(`Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
                 deploy_release = await octokit.repos.createRelease({
