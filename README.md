@@ -46,6 +46,8 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Default** : false
 
+If tags is set true, you should use the action event ```on: create``` . See https://help.github.com/en/articles/workflow-syntax-for-github-actions#on for more details.
+
 ### `branches`
 
 **Optional** Only work on these branches, set to nothing to accept all branches.
