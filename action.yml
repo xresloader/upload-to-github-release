@@ -28,8 +28,14 @@ inputs:
     default: ''
   
 outputs:
-  time: # id of output
-    description: 'The time we greeted you'
+  release_name:
+    description: 'The release name'
+  release_url:
+    description: 'The release url'
+  release_tag_name:
+    description: 'The release tag name'
+  release_commitish:
+    description: 'The release commit'
 
 runs:
   using: 'node12'

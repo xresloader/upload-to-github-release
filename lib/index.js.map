@@ -9028,26 +9028,45 @@ function run() {
             console.log(`repo_info = ${JSON.stringify(repo_info)}`);
             console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
             // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
-            const check_release = yield octokit.repos.getReleaseByTag({
-                owner: "xresloader",
-                repo: "xresloader",
-                tag: "v2.5.0"
-            });
-            const old_release = yield octokit.repos.getReleaseByTag({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
-                tag: release_name
-            });
+            var check_release = undefined;
+            try {
+                check_release = yield octokit.repos.getReleaseByTag({
+                    owner: "xresloader",
+                    repo: "xresloader",
+                    tag: "v2.5.0"
+                });
+            }
+            catch (error) {
+                console.log(`${error.message}`);
+            }
+            var old_release = undefined;
+            try {
+                old_release = yield octokit.repos.getReleaseByTag({
+                    owner: action_github.context.repo.owner,
+                    repo: action_github.context.repo.repo,
+                    tag: release_name
+                });
+            }
+            catch (error) {
+                console.log(`Try to get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+            }
             console.log("============================= v3 API: getReleaseByTag =============================");
-            console.log(`xresloader.getReleaseByTag.status = ${check_release.status}  -- ${check_release.headers.status}`);
-            console.log(`xresloader.getReleaseByTag.data = ${JSON.stringify(check_release.data)}`);
-            console.log(`${action_github.context.repo.repo}.getReleaseByTag.status = ${old_release.status}  -- ${old_release.headers.status}`);
-            console.log(`${action_github.context.repo.repo}.getReleaseByTag.data = ${JSON.stringify(old_release.data)}`);
+            if (check_release) {
+                console.log(`xresloader.getReleaseByTag.status = ${check_release.status}  -- ${check_release.headers.status}`);
+                console.log(`xresloader.getReleaseByTag.data = ${JSON.stringify(check_release.data)}`);
+            }
+            if (old_release) {
+                console.log(`${action_github.context.repo.repo}.getReleaseByTag.status = ${old_release.status}  -- ${old_release.headers.status}`);
+                console.log(`${action_github.context.repo.repo}.getReleaseByTag.data = ${JSON.stringify(old_release.data)}`);
+            }
             const pending_to_delete = [];
             const pending_to_upload = [];
-            var upload_url = old_release.data.upload_url;
+            var upload_url = old_release ? old_release.data.upload_url : "";
+            var release_url = old_release ? old_release.data.url : "";
+            var release_tag_name = old_release ? old_release.data.tag_name : "";
+            var release_commitish = old_release ? old_release.data.target_commitish : "";
             // https://developer.github.com/v3/repos/releases/#create-a-release
-            if (false /* release not found */) {}
+            if (false /* release not found */) { var msg; }
             if (old_release && old_release.data && old_release.data.assets) {
                 const old_asset_map = {};
                 for (const asset of old_release.data.assets || []) {
@@ -9071,36 +9090,49 @@ function run() {
             }
             // Delete old assets.
             for (const asset of pending_to_delete) {
-                // const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
-                console.log(`Deleting old asset: ${asset.name} ...`);
-                const delete_rsp = yield octokit.repos.deleteReleaseAsset({
-                    owner: action_github.context.repo.owner,
-                    repo: action_github.context.repo.repo,
-                    asset_id: asset.id
-                });
-                console.log(`Delete old asset: ${asset.name} => ${delete_rsp.headers.status}`);
+                try {
+                    // const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
+                    console.log(`Deleting old asset: ${asset.name} ...`);
+                    const delete_rsp = yield octokit.repos.deleteReleaseAsset({
+                        owner: action_github.context.repo.owner,
+                        repo: action_github.context.repo.repo,
+                        asset_id: asset.id
+                    });
+                    console.log(`Delete old asset: ${asset.name} => ${delete_rsp.headers.status}`);
+                }
+                catch (error) {
+                    const msg = `Delete old asset: ${asset.name} failed => ${error.message}`;
+                    console.log(msg);
+                }
             }
             // Upload new assets
             for (const file_path of pending_to_upload) {
-                console.log(`Uploading asset: ${file_path} ...`);
-                const find_mime = lite_1.default.getType(path.extname(file_path));
                 const file_base_name = path.basename(file_path);
-                const upload_rsp = yield octokit.repos.uploadReleaseAsset({
-                    url: upload_url,
-                    headers: {
-                        "content-type": find_mime || "application/octet-stream",
-                        "content-length": fs.statSync(file_path).size
-                    },
-                    name: file_base_name,
-                    file: fs.createReadStream(file_path)
-                });
-                if (200 != (upload_rsp.status - upload_rsp.status % 100)) {
-                    const msg = `Upload asset: ${file_base_name} failed => ${upload_rsp.headers.status}`;
+                try {
+                    console.log(`Uploading asset: ${file_path} ...`);
+                    const find_mime = lite_1.default.getType(path.extname(file_path));
+                    const upload_rsp = yield octokit.repos.uploadReleaseAsset({
+                        url: upload_url,
+                        headers: {
+                            "content-type": find_mime || "application/octet-stream",
+                            "content-length": fs.statSync(file_path).size
+                        },
+                        name: file_base_name,
+                        file: fs.createReadStream(file_path)
+                    });
+                    if (200 != (upload_rsp.status - upload_rsp.status % 100)) {
+                        const msg = `Upload asset: ${file_base_name} failed => ${upload_rsp.headers.status}`;
+                        console.log(msg);
+                        action_core.setFailed(msg);
+                    }
+                    else {
+                        console.log(`Upload asset: ${file_base_name} success => ${upload_rsp.headers.status}`);
+                    }
+                }
+                catch (error) {
+                    const msg = `Upload asset: ${file_base_name} failed => ${error.message}\r\n${error.stack}`;
                     console.log(msg);
                     action_core.setFailed(msg);
-                }
-                else {
-                    console.log(`Upload asset: ${file_base_name} success => ${upload_rsp.headers.status}`);
                 }
             }
             // Environment
@@ -9117,8 +9149,10 @@ function run() {
             // GITHUB_WORKFLOW=main
             // GITHUB_WORKSPACE=/home/runner/work/upload-to-github-release-test/upload-to-github-release-test
             // set output
-            const time = (new Date()).toTimeString();
-            action_core.setOutput("time", time);
+            action_core.setOutput("release_name", release_name);
+            action_core.setOutput("release_url", release_url);
+            action_core.setOutput("release_tag_name", release_tag_name);
+            action_core.setOutput("release_commitish", release_commitish);
         }
         catch (error) {
             action_core.setFailed(error.message + "\r\n" + error.stack);

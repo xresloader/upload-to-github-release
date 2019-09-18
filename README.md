@@ -62,9 +62,22 @@ If tags is set true, you should use the action event ```on: create``` . See http
 
 ## Outputs
 
-### `time`
+### `release_name`
 
-The time we greeted you.
+The release name.
+
+### `release_url`
+
+The release url.
+
+### `release_tag_name`
+
+The release tag name.
+
+### `release_commitish`
+
+The release commitish.
+
 
 ## Example usage
 
