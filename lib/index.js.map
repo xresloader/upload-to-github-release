@@ -1,4 +1,4 @@
-require('./sourcemap-register.js');module.exports =
+module.exports =
 /******/ (function(modules, runtime) { // webpackBootstrap
 /******/ 	"use strict";
 /******/ 	// The module cache
@@ -390,208 +390,358 @@ module.exports._enoent = enoent;
 /* 27 */,
 /* 28 */,
 /* 29 */,
-/* 30 */,
+/* 30 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const stringify = __webpack_require__(758);
+
+/**
+ * Constants
+ */
+
+const {
+  MAX_LENGTH,
+  CHAR_BACKSLASH, /* \ */
+  CHAR_BACKTICK, /* ` */
+  CHAR_COMMA, /* , */
+  CHAR_DOT, /* . */
+  CHAR_LEFT_PARENTHESES, /* ( */
+  CHAR_RIGHT_PARENTHESES, /* ) */
+  CHAR_LEFT_CURLY_BRACE, /* { */
+  CHAR_RIGHT_CURLY_BRACE, /* } */
+  CHAR_LEFT_SQUARE_BRACKET, /* [ */
+  CHAR_RIGHT_SQUARE_BRACKET, /* ] */
+  CHAR_DOUBLE_QUOTE, /* " */
+  CHAR_SINGLE_QUOTE, /* ' */
+  CHAR_NO_BREAK_SPACE,
+  CHAR_ZERO_WIDTH_NOBREAK_SPACE
+} = __webpack_require__(461);
+
+/**
+ * parse
+ */
+
+const parse = (input, options = {}) => {
+  if (typeof input !== 'string') {
+    throw new TypeError('Expected a string');
+  }
+
+  let opts = options || {};
+  let max = typeof opts.maxLength === 'number' ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
+  if (input.length > max) {
+    throw new SyntaxError(`Input length (${input.length}), exceeds max characters (${max})`);
+  }
+
+  let ast = { type: 'root', input, nodes: [] };
+  let stack = [ast];
+  let block = ast;
+  let prev = ast;
+  let brackets = 0;
+  let length = input.length;
+  let index = 0;
+  let depth = 0;
+  let value;
+  let memo = {};
+
+  /**
+   * Helpers
+   */
+
+  const advance = () => input[index++];
+  const push = node => {
+    if (node.type === 'text' && prev.type === 'dot') {
+      prev.type = 'text';
+    }
+
+    if (prev && prev.type === 'text' && node.type === 'text') {
+      prev.value += node.value;
+      return;
+    }
+
+    block.nodes.push(node);
+    node.parent = block;
+    node.prev = prev;
+    prev = node;
+    return node;
+  };
+
+  push({ type: 'bos' });
+
+  while (index < length) {
+    block = stack[stack.length - 1];
+    value = advance();
+
+    /**
+     * Invalid chars
+     */
+
+    if (value === CHAR_ZERO_WIDTH_NOBREAK_SPACE || value === CHAR_NO_BREAK_SPACE) {
+      continue;
+    }
+
+    /**
+     * Escaped chars
+     */
+
+    if (value === CHAR_BACKSLASH) {
+      push({ type: 'text', value: (options.keepEscaping ? value : '') + advance() });
+      continue;
+    }
+
+    /**
+     * Right square bracket (literal): ']'
+     */
+
+    if (value === CHAR_RIGHT_SQUARE_BRACKET) {
+      push({ type: 'text', value: '\\' + value });
+      continue;
+    }
+
+    /**
+     * Left square bracket: '['
+     */
+
+    if (value === CHAR_LEFT_SQUARE_BRACKET) {
+      brackets++;
+
+      let closed = true;
+      let next;
+
+      while (index < length && (next = advance())) {
+        value += next;
+
+        if (next === CHAR_LEFT_SQUARE_BRACKET) {
+          brackets++;
+          continue;
+        }
+
+        if (next === CHAR_BACKSLASH) {
+          value += advance();
+          continue;
+        }
+
+        if (next === CHAR_RIGHT_SQUARE_BRACKET) {
+          brackets--;
+
+          if (brackets === 0) {
+            break;
+          }
+        }
+      }
+
+      push({ type: 'text', value });
+      continue;
+    }
+
+    /**
+     * Parentheses
+     */
+
+    if (value === CHAR_LEFT_PARENTHESES) {
+      block = push({ type: 'paren', nodes: [] });
+      stack.push(block);
+      push({ type: 'text', value });
+      continue;
+    }
+
+    if (value === CHAR_RIGHT_PARENTHESES) {
+      if (block.type !== 'paren') {
+        push({ type: 'text', value });
+        continue;
+      }
+      block = stack.pop();
+      push({ type: 'text', value });
+      block = stack[stack.length - 1];
+      continue;
+    }
+
+    /**
+     * Quotes: '|"|`
+     */
+
+    if (value === CHAR_DOUBLE_QUOTE || value === CHAR_SINGLE_QUOTE || value === CHAR_BACKTICK) {
+      let open = value;
+      let next;
+
+      if (options.keepQuotes !== true) {
+        value = '';
+      }
+
+      while (index < length && (next = advance())) {
+        if (next === CHAR_BACKSLASH) {
+          value += next + advance();
+          continue;
+        }
+
+        if (next === open) {
+          if (options.keepQuotes === true) value += next;
+          break;
+        }
+
+        value += next;
+      }
+
+      push({ type: 'text', value });
+      continue;
+    }
+
+    /**
+     * Left curly brace: '{'
+     */
+
+    if (value === CHAR_LEFT_CURLY_BRACE) {
+      depth++;
+
+      let dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;
+      let brace = {
+        type: 'brace',
+        open: true,
+        close: false,
+        dollar,
+        depth,
+        commas: 0,
+        ranges: 0,
+        nodes: []
+      };
+
+      block = push(brace);
+      stack.push(block);
+      push({ type: 'open', value });
+      continue;
+    }
+
+    /**
+     * Right curly brace: '}'
+     */
+
+    if (value === CHAR_RIGHT_CURLY_BRACE) {
+      if (block.type !== 'brace') {
+        push({ type: 'text', value });
+        continue;
+      }
+
+      let type = 'close';
+      block = stack.pop();
+      block.close = true;
+
+      push({ type, value });
+      depth--;
+
+      block = stack[stack.length - 1];
+      continue;
+    }
+
+    /**
+     * Comma: ','
+     */
+
+    if (value === CHAR_COMMA && depth > 0) {
+      if (block.ranges > 0) {
+        block.ranges = 0;
+        let open = block.nodes.shift();
+        block.nodes = [open, { type: 'text', value: stringify(block) }];
+      }
+
+      push({ type: 'comma', value });
+      block.commas++;
+      continue;
+    }
+
+    /**
+     * Dot: '.'
+     */
+
+    if (value === CHAR_DOT && depth > 0 && block.commas === 0) {
+      let siblings = block.nodes;
+
+      if (depth === 0 || siblings.length === 0) {
+        push({ type: 'text', value });
+        continue;
+      }
+
+      if (prev.type === 'dot') {
+        block.range = [];
+        prev.value += value;
+        prev.type = 'range';
+
+        if (block.nodes.length !== 3 && block.nodes.length !== 5) {
+          block.invalid = true;
+          block.ranges = 0;
+          prev.type = 'text';
+          continue;
+        }
+
+        block.ranges++;
+        block.args = [];
+        continue;
+      }
+
+      if (prev.type === 'range') {
+        siblings.pop();
+
+        let before = siblings[siblings.length - 1];
+        before.value += prev.value + value;
+        prev = before;
+        block.ranges--;
+        continue;
+      }
+
+      push({ type: 'dot', value });
+      continue;
+    }
+
+    /**
+     * Text
+     */
+
+    push({ type: 'text', value });
+  }
+
+  // Mark imbalanced braces and brackets as invalid
+  do {
+    block = stack.pop();
+
+    if (block.type !== 'root') {
+      block.nodes.forEach(node => {
+        if (!node.nodes) {
+          if (node.type === 'open') node.isOpen = true;
+          if (node.type === 'close') node.isClose = true;
+          if (!node.nodes) node.type = 'text';
+          node.invalid = true;
+        }
+      });
+
+      // get the location of the block on parent.nodes (block's siblings)
+      let parent = stack[stack.length - 1];
+      let index = parent.nodes.indexOf(block);
+      // replace the (invalid) block with it's nodes
+      parent.nodes.splice(index, 1, ...block.nodes);
+    }
+  } while (stack.length > 0);
+
+  push({ type: 'eos' });
+  return ast;
+};
+
+module.exports = parse;
+
+
+/***/ }),
 /* 31 */,
 /* 32 */,
 /* 33 */,
-/* 34 */
-/***/ (function(module) {
-
-module.exports = require("https");
-
-/***/ }),
-/* 35 */,
-/* 36 */,
-/* 37 */,
-/* 38 */,
-/* 39 */
-/***/ (function(module) {
-
-"use strict";
-
-module.exports = opts => {
-	opts = opts || {};
-
-	const env = opts.env || process.env;
-	const platform = opts.platform || process.platform;
-
-	if (platform !== 'win32') {
-		return 'PATH';
-	}
-
-	return Object.keys(env).find(x => x.toUpperCase() === 'PATH') || 'Path';
-};
-
-
-/***/ }),
-/* 40 */,
-/* 41 */,
-/* 42 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const merge2 = __webpack_require__(538);
-function merge(streams) {
-    const mergedStream = merge2(streams);
-    streams.forEach((stream) => {
-        stream.once('error', (err) => mergedStream.emit('error', err));
-    });
-    return mergedStream;
-}
-exports.merge = merge;
-
-
-/***/ }),
-/* 43 */
-/***/ (function(__unusedmodule, exports) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-class DirentFromStats {
-    constructor(name, stats) {
-        this.name = name;
-        this.isBlockDevice = stats.isBlockDevice.bind(stats);
-        this.isCharacterDevice = stats.isCharacterDevice.bind(stats);
-        this.isDirectory = stats.isDirectory.bind(stats);
-        this.isFIFO = stats.isFIFO.bind(stats);
-        this.isFile = stats.isFile.bind(stats);
-        this.isSocket = stats.isSocket.bind(stats);
-        this.isSymbolicLink = stats.isSymbolicLink.bind(stats);
-    }
-}
-function createDirentFromStats(name, stats) {
-    return new DirentFromStats(name, stats);
-}
-exports.createDirentFromStats = createDirentFromStats;
-
-
-/***/ }),
-/* 44 */,
-/* 45 */,
-/* 46 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-module.exports = getUserAgentNode
-
-const osName = __webpack_require__(2)
-
-function getUserAgentNode () {
-  try {
-    return `Node.js/${process.version.substr(1)} (${osName()}; ${process.arch})`
-  } catch (error) {
-    if (/wmic os get Caption/.test(error.message)) {
-      return 'Windows <version undetectable>'
-    }
-
-    throw error
-  }
-}
-
-
-/***/ }),
-/* 47 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-module.exports = factory
-
-const Octokit = __webpack_require__(402)
-const registerPlugin = __webpack_require__(855)
-
-function factory (plugins) {
-  const Api = Octokit.bind(null, plugins || [])
-  Api.plugin = registerPlugin.bind(null, plugins || [])
-  return Api
-}
-
-
-/***/ }),
-/* 48 */,
-/* 49 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-const os = __webpack_require__(87);
-const execa = __webpack_require__(955);
-
-// Reference: https://www.gaijin.at/en/lstwinver.php
-const names = new Map([
-	['10.0', '10'],
-	['6.3', '8.1'],
-	['6.2', '8'],
-	['6.1', '7'],
-	['6.0', 'Vista'],
-	['5.2', 'Server 2003'],
-	['5.1', 'XP'],
-	['5.0', '2000'],
-	['4.9', 'ME'],
-	['4.1', '98'],
-	['4.0', '95']
-]);
-
-const windowsRelease = release => {
-	const version = /\d+\.\d/.exec(release || os.release());
-
-	if (release && !version) {
-		throw new Error('`release` argument doesn\'t match `n.n`');
-	}
-
-	const ver = (version || [])[0];
-
-	// Server 2008, 2012 and 2016 versions are ambiguous with desktop versions and must be detected at runtime.
-	// If `release` is omitted or we're on a Windows system, and the version number is an ambiguous version
-	// then use `wmic` to get the OS caption: https://msdn.microsoft.com/en-us/library/aa394531(v=vs.85).aspx
-	// If the resulting caption contains the year 2008, 2012 or 2016, it is a server version, so return a server OS name.
-	if ((!release || release === os.release()) && ['6.1', '6.2', '6.3', '10.0'].includes(ver)) {
-		const stdout = execa.sync('wmic', ['os', 'get', 'Caption']).stdout || '';
-		const year = (stdout.match(/2008|2012|2016/) || [])[0];
-		if (year) {
-			return `Server ${year}`;
-		}
-	}
-
-	return names.get(ver);
-};
-
-module.exports = windowsRelease;
-
-
-/***/ }),
-/* 50 */,
-/* 51 */,
-/* 52 */,
-/* 53 */,
-/* 54 */,
-/* 55 */,
-/* 56 */,
-/* 57 */,
-/* 58 */,
-/* 59 */,
-/* 60 */,
-/* 61 */,
-/* 62 */,
-/* 63 */,
-/* 64 */,
-/* 65 */,
-/* 66 */,
-/* 67 */,
-/* 68 */,
-/* 69 */,
-/* 70 */,
-/* 71 */,
-/* 72 */,
-/* 73 */,
-/* 74 */
+/* 34 */,
+/* 35 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
 const util = __webpack_require__(669);
-const braces = __webpack_require__(783);
+const braces = __webpack_require__(618);
 const picomatch = __webpack_require__(827);
 const utils = __webpack_require__(224);
 const isEmptyString = val => typeof val === 'string' && (val === '' || val === './');
@@ -1058,6 +1208,170 @@ module.exports = micromatch;
 
 
 /***/ }),
+/* 36 */,
+/* 37 */,
+/* 38 */,
+/* 39 */
+/***/ (function(module) {
+
+"use strict";
+
+module.exports = opts => {
+	opts = opts || {};
+
+	const env = opts.env || process.env;
+	const platform = opts.platform || process.platform;
+
+	if (platform !== 'win32') {
+		return 'PATH';
+	}
+
+	return Object.keys(env).find(x => x.toUpperCase() === 'PATH') || 'Path';
+};
+
+
+/***/ }),
+/* 40 */,
+/* 41 */,
+/* 42 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const merge2 = __webpack_require__(538);
+function merge(streams) {
+    const mergedStream = merge2(streams);
+    streams.forEach((stream) => {
+        stream.once('error', (err) => mergedStream.emit('error', err));
+    });
+    return mergedStream;
+}
+exports.merge = merge;
+
+
+/***/ }),
+/* 43 */
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+class DirentFromStats {
+    constructor(name, stats) {
+        this.name = name;
+        this.isBlockDevice = stats.isBlockDevice.bind(stats);
+        this.isCharacterDevice = stats.isCharacterDevice.bind(stats);
+        this.isDirectory = stats.isDirectory.bind(stats);
+        this.isFIFO = stats.isFIFO.bind(stats);
+        this.isFile = stats.isFile.bind(stats);
+        this.isSocket = stats.isSocket.bind(stats);
+        this.isSymbolicLink = stats.isSymbolicLink.bind(stats);
+    }
+}
+function createDirentFromStats(name, stats) {
+    return new DirentFromStats(name, stats);
+}
+exports.createDirentFromStats = createDirentFromStats;
+
+
+/***/ }),
+/* 44 */,
+/* 45 */,
+/* 46 */,
+/* 47 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+module.exports = factory
+
+const Octokit = __webpack_require__(402)
+const registerPlugin = __webpack_require__(855)
+
+function factory (plugins) {
+  const Api = Octokit.bind(null, plugins || [])
+  Api.plugin = registerPlugin.bind(null, plugins || [])
+  return Api
+}
+
+
+/***/ }),
+/* 48 */,
+/* 49 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+const os = __webpack_require__(87);
+const execa = __webpack_require__(955);
+
+// Reference: https://www.gaijin.at/en/lstwinver.php
+const names = new Map([
+	['10.0', '10'],
+	['6.3', '8.1'],
+	['6.2', '8'],
+	['6.1', '7'],
+	['6.0', 'Vista'],
+	['5.2', 'Server 2003'],
+	['5.1', 'XP'],
+	['5.0', '2000'],
+	['4.9', 'ME'],
+	['4.1', '98'],
+	['4.0', '95']
+]);
+
+const windowsRelease = release => {
+	const version = /\d+\.\d/.exec(release || os.release());
+
+	if (release && !version) {
+		throw new Error('`release` argument doesn\'t match `n.n`');
+	}
+
+	const ver = (version || [])[0];
+
+	// Server 2008, 2012 and 2016 versions are ambiguous with desktop versions and must be detected at runtime.
+	// If `release` is omitted or we're on a Windows system, and the version number is an ambiguous version
+	// then use `wmic` to get the OS caption: https://msdn.microsoft.com/en-us/library/aa394531(v=vs.85).aspx
+	// If the resulting caption contains the year 2008, 2012 or 2016, it is a server version, so return a server OS name.
+	if ((!release || release === os.release()) && ['6.1', '6.2', '6.3', '10.0'].includes(ver)) {
+		const stdout = execa.sync('wmic', ['os', 'get', 'Caption']).stdout || '';
+		const year = (stdout.match(/2008|2012|2016/) || [])[0];
+		if (year) {
+			return `Server ${year}`;
+		}
+	}
+
+	return names.get(ver);
+};
+
+module.exports = windowsRelease;
+
+
+/***/ }),
+/* 50 */,
+/* 51 */,
+/* 52 */,
+/* 53 */,
+/* 54 */,
+/* 55 */,
+/* 56 */,
+/* 57 */,
+/* 58 */,
+/* 59 */,
+/* 60 */,
+/* 61 */,
+/* 62 */,
+/* 63 */,
+/* 64 */,
+/* 65 */,
+/* 66 */,
+/* 67 */,
+/* 68 */,
+/* 69 */,
+/* 70 */,
+/* 71 */,
+/* 72 */,
+/* 73 */,
+/* 74 */,
 /* 75 */,
 /* 76 */,
 /* 77 */,
@@ -4237,7 +4551,301 @@ module.exports = require("child_process");
 /* 138 */,
 /* 139 */,
 /* 140 */,
-/* 141 */,
+/* 141 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+/*!
+ * to-regex-range <https://github.com/micromatch/to-regex-range>
+ *
+ * Copyright (c) 2015-present, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+
+
+const isNumber = __webpack_require__(290);
+
+const toRegexRange = (min, max, options) => {
+  if (isNumber(min) === false) {
+    throw new TypeError('toRegexRange: expected the first argument to be a number');
+  }
+
+  if (max === void 0 || min === max) {
+    return String(min);
+  }
+
+  if (isNumber(max) === false) {
+    throw new TypeError('toRegexRange: expected the second argument to be a number.');
+  }
+
+  let opts = { relaxZeros: true, ...options };
+  if (typeof opts.strictZeros === 'boolean') {
+    opts.relaxZeros = opts.strictZeros === false;
+  }
+
+  let relax = String(opts.relaxZeros);
+  let shorthand = String(opts.shorthand);
+  let capture = String(opts.capture);
+  let wrap = String(opts.wrap);
+  let cacheKey = min + ':' + max + '=' + relax + shorthand + capture + wrap;
+
+  if (toRegexRange.cache.hasOwnProperty(cacheKey)) {
+    return toRegexRange.cache[cacheKey].result;
+  }
+
+  let a = Math.min(min, max);
+  let b = Math.max(min, max);
+
+  if (Math.abs(a - b) === 1) {
+    let result = min + '|' + max;
+    if (opts.capture) {
+      return `(${result})`;
+    }
+    if (opts.wrap === false) {
+      return result;
+    }
+    return `(?:${result})`;
+  }
+
+  let isPadded = hasPadding(min) || hasPadding(max);
+  let state = { min, max, a, b };
+  let positives = [];
+  let negatives = [];
+
+  if (isPadded) {
+    state.isPadded = isPadded;
+    state.maxLen = String(state.max).length;
+  }
+
+  if (a < 0) {
+    let newMin = b < 0 ? Math.abs(b) : 1;
+    negatives = splitToPatterns(newMin, Math.abs(a), state, opts);
+    a = state.a = 0;
+  }
+
+  if (b >= 0) {
+    positives = splitToPatterns(a, b, state, opts);
+  }
+
+  state.negatives = negatives;
+  state.positives = positives;
+  state.result = collatePatterns(negatives, positives, opts);
+
+  if (opts.capture === true) {
+    state.result = `(${state.result})`;
+  } else if (opts.wrap !== false && (positives.length + negatives.length) > 1) {
+    state.result = `(?:${state.result})`;
+  }
+
+  toRegexRange.cache[cacheKey] = state;
+  return state.result;
+};
+
+function collatePatterns(neg, pos, options) {
+  let onlyNegative = filterPatterns(neg, pos, '-', false, options) || [];
+  let onlyPositive = filterPatterns(pos, neg, '', false, options) || [];
+  let intersected = filterPatterns(neg, pos, '-?', true, options) || [];
+  let subpatterns = onlyNegative.concat(intersected).concat(onlyPositive);
+  return subpatterns.join('|');
+}
+
+function splitToRanges(min, max) {
+  let nines = 1;
+  let zeros = 1;
+
+  let stop = countNines(min, nines);
+  let stops = new Set([max]);
+
+  while (min <= stop && stop <= max) {
+    stops.add(stop);
+    nines += 1;
+    stop = countNines(min, nines);
+  }
+
+  stop = countZeros(max + 1, zeros) - 1;
+
+  while (min < stop && stop <= max) {
+    stops.add(stop);
+    zeros += 1;
+    stop = countZeros(max + 1, zeros) - 1;
+  }
+
+  stops = [...stops];
+  stops.sort(compare);
+  return stops;
+}
+
+/**
+ * Convert a range to a regex pattern
+ * @param {Number} `start`
+ * @param {Number} `stop`
+ * @return {String}
+ */
+
+function rangeToPattern(start, stop, options) {
+  if (start === stop) {
+    return { pattern: start, count: [], digits: 0 };
+  }
+
+  let zipped = zip(start, stop);
+  let digits = zipped.length;
+  let pattern = '';
+  let count = 0;
+
+  for (let i = 0; i < digits; i++) {
+    let [startDigit, stopDigit] = zipped[i];
+
+    if (startDigit === stopDigit) {
+      pattern += startDigit;
+
+    } else if (startDigit !== '0' || stopDigit !== '9') {
+      pattern += toCharacterClass(startDigit, stopDigit, options);
+
+    } else {
+      count++;
+    }
+  }
+
+  if (count) {
+    pattern += options.shorthand === true ? '\\d' : '[0-9]';
+  }
+
+  return { pattern, count: [count], digits };
+}
+
+function splitToPatterns(min, max, tok, options) {
+  let ranges = splitToRanges(min, max);
+  let tokens = [];
+  let start = min;
+  let prev;
+
+  for (let i = 0; i < ranges.length; i++) {
+    let max = ranges[i];
+    let obj = rangeToPattern(String(start), String(max), options);
+    let zeros = '';
+
+    if (!tok.isPadded && prev && prev.pattern === obj.pattern) {
+      if (prev.count.length > 1) {
+        prev.count.pop();
+      }
+
+      prev.count.push(obj.count[0]);
+      prev.string = prev.pattern + toQuantifier(prev.count);
+      start = max + 1;
+      continue;
+    }
+
+    if (tok.isPadded) {
+      zeros = padZeros(max, tok, options);
+    }
+
+    obj.string = zeros + obj.pattern + toQuantifier(obj.count);
+    tokens.push(obj);
+    start = max + 1;
+    prev = obj;
+  }
+
+  return tokens;
+}
+
+function filterPatterns(arr, comparison, prefix, intersection, options) {
+  let result = [];
+
+  for (let ele of arr) {
+    let { string } = ele;
+
+    // only push if _both_ are negative...
+    if (!intersection && !contains(comparison, 'string', string)) {
+      result.push(prefix + string);
+    }
+
+    // or _both_ are positive
+    if (intersection && contains(comparison, 'string', string)) {
+      result.push(prefix + string);
+    }
+  }
+  return result;
+}
+
+/**
+ * Zip strings
+ */
+
+function zip(a, b) {
+  let arr = [];
+  for (let i = 0; i < a.length; i++) arr.push([a[i], b[i]]);
+  return arr;
+}
+
+function compare(a, b) {
+  return a > b ? 1 : b > a ? -1 : 0;
+}
+
+function contains(arr, key, val) {
+  return arr.some(ele => ele[key] === val);
+}
+
+function countNines(min, len) {
+  return Number(String(min).slice(0, -len) + '9'.repeat(len));
+}
+
+function countZeros(integer, zeros) {
+  return integer - (integer % Math.pow(10, zeros));
+}
+
+function toQuantifier(digits) {
+  let [start = 0, stop = ''] = digits;
+  if (stop || start > 1) {
+    return `{${start + (stop ? ',' + stop : '')}}`;
+  }
+  return '';
+}
+
+function toCharacterClass(a, b, options) {
+  return `[${a}${(b - a === 1) ? '' : '-'}${b}]`;
+}
+
+function hasPadding(str) {
+  return /^-?(0+)\d/.test(str);
+}
+
+function padZeros(value, tok, options) {
+  if (!tok.isPadded) {
+    return value;
+  }
+
+  let diff = Math.abs(tok.maxLen - String(value).length);
+  let relax = options.relaxZeros !== false;
+
+  switch (diff) {
+    case 0:
+      return '';
+    case 1:
+      return relax ? '0?' : '0';
+    case 2:
+      return relax ? '0{0,2}' : '00';
+    default: {
+      return relax ? `0{0,${diff}}` : `0{${diff}}`;
+    }
+  }
+}
+
+/**
+ * Cache
+ */
+
+toRegexRange.cache = {};
+toRegexRange.clearCache = () => (toRegexRange.cache = {});
+
+/**
+ * Expose `toRegexRange`
+ */
+
+module.exports = toRegexRange;
+
+
+/***/ }),
 /* 142 */,
 /* 143 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -4348,70 +4956,7 @@ function paginatePlugin (octokit) {
 /* 151 */,
 /* 152 */,
 /* 153 */,
-/* 154 */
-/***/ (function(module) {
-
-"use strict";
-
-
-module.exports = {
-  MAX_LENGTH: 1024 * 64,
-
-  // Digits
-  CHAR_0: '0', /* 0 */
-  CHAR_9: '9', /* 9 */
-
-  // Alphabet chars.
-  CHAR_UPPERCASE_A: 'A', /* A */
-  CHAR_LOWERCASE_A: 'a', /* a */
-  CHAR_UPPERCASE_Z: 'Z', /* Z */
-  CHAR_LOWERCASE_Z: 'z', /* z */
-
-  CHAR_LEFT_PARENTHESES: '(', /* ( */
-  CHAR_RIGHT_PARENTHESES: ')', /* ) */
-
-  CHAR_ASTERISK: '*', /* * */
-
-  // Non-alphabetic chars.
-  CHAR_AMPERSAND: '&', /* & */
-  CHAR_AT: '@', /* @ */
-  CHAR_BACKSLASH: '\\', /* \ */
-  CHAR_BACKTICK: '`', /* ` */
-  CHAR_CARRIAGE_RETURN: '\r', /* \r */
-  CHAR_CIRCUMFLEX_ACCENT: '^', /* ^ */
-  CHAR_COLON: ':', /* : */
-  CHAR_COMMA: ',', /* , */
-  CHAR_DOLLAR: '$', /* . */
-  CHAR_DOT: '.', /* . */
-  CHAR_DOUBLE_QUOTE: '"', /* " */
-  CHAR_EQUAL: '=', /* = */
-  CHAR_EXCLAMATION_MARK: '!', /* ! */
-  CHAR_FORM_FEED: '\f', /* \f */
-  CHAR_FORWARD_SLASH: '/', /* / */
-  CHAR_HASH: '#', /* # */
-  CHAR_HYPHEN_MINUS: '-', /* - */
-  CHAR_LEFT_ANGLE_BRACKET: '<', /* < */
-  CHAR_LEFT_CURLY_BRACE: '{', /* { */
-  CHAR_LEFT_SQUARE_BRACKET: '[', /* [ */
-  CHAR_LINE_FEED: '\n', /* \n */
-  CHAR_NO_BREAK_SPACE: '\u00A0', /* \u00A0 */
-  CHAR_PERCENT: '%', /* % */
-  CHAR_PLUS: '+', /* + */
-  CHAR_QUESTION_MARK: '?', /* ? */
-  CHAR_RIGHT_ANGLE_BRACKET: '>', /* > */
-  CHAR_RIGHT_CURLY_BRACE: '}', /* } */
-  CHAR_RIGHT_SQUARE_BRACKET: ']', /* ] */
-  CHAR_SEMICOLON: ';', /* ; */
-  CHAR_SINGLE_QUOTE: '\'', /* ' */
-  CHAR_SPACE: ' ', /*   */
-  CHAR_TAB: '\t', /* \t */
-  CHAR_UNDERSCORE: '_', /* _ */
-  CHAR_VERTICAL_LINE: '|', /* | */
-  CHAR_ZERO_WIDTH_NOBREAK_SPACE: '\uFEFF' /* \uFEFF */
-};
-
-
-/***/ }),
+/* 154 */,
 /* 155 */,
 /* 156 */,
 /* 157 */,
@@ -4652,24 +5197,7 @@ function callSuccessCallback(callback, result) {
 
 /***/ }),
 /* 183 */,
-/* 184 */
-/***/ (function(module) {
-
-"use strict";
-
-module.exports = path => {
-	const isExtendedLengthPath = /^\\\\\?\\/.test(path);
-	const hasNonAscii = /[^\u0000-\u0080]+/.test(path); // eslint-disable-line no-control-regex
-
-	if (isExtendedLengthPath || hasNonAscii) {
-		return path;
-	}
-
-	return path.replace(/\\/g, '/');
-};
-
-
-/***/ }),
+/* 184 */,
 /* 185 */,
 /* 186 */,
 /* 187 */,
@@ -4947,7 +5475,262 @@ module.exports = {
 /* 202 */,
 /* 203 */,
 /* 204 */,
-/* 205 */,
+/* 205 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+/*!
+ * fill-range <https://github.com/jonschlinkert/fill-range>
+ *
+ * Copyright (c) 2014-present, Jon Schlinkert.
+ * Licensed under the MIT License.
+ */
+
+
+
+const util = __webpack_require__(669);
+const toRegexRange = __webpack_require__(141);
+
+const isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
+
+const transform = toNumber => {
+  return value => toNumber === true ? Number(value) : String(value);
+};
+
+const isValidValue = value => {
+  return typeof value === 'number' || (typeof value === 'string' && value !== '');
+};
+
+const isNumber = num => Number.isInteger(+num);
+
+const zeros = input => {
+  let value = `${input}`;
+  let index = -1;
+  if (value[0] === '-') value = value.slice(1);
+  if (value === '0') return false;
+  while (value[++index] === '0');
+  return index > 0;
+};
+
+const stringify = (start, end, options) => {
+  if (typeof start === 'string' || typeof end === 'string') {
+    return true;
+  }
+  return options.stringify === true;
+};
+
+const pad = (input, maxLength, toNumber) => {
+  if (maxLength > 0) {
+    let dash = input[0] === '-' ? '-' : '';
+    if (dash) input = input.slice(1);
+    input = (dash + input.padStart(dash ? maxLength - 1 : maxLength, '0'));
+  }
+  if (toNumber === false) {
+    return String(input);
+  }
+  return input;
+};
+
+const toMaxLen = (input, maxLength) => {
+  let negative = input[0] === '-' ? '-' : '';
+  if (negative) {
+    input = input.slice(1);
+    maxLength--;
+  }
+  while (input.length < maxLength) input = '0' + input;
+  return negative ? ('-' + input) : input;
+};
+
+const toSequence = (parts, options) => {
+  parts.negatives.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  parts.positives.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+
+  let prefix = options.capture ? '' : '?:';
+  let positives = '';
+  let negatives = '';
+  let result;
+
+  if (parts.positives.length) {
+    positives = parts.positives.join('|');
+  }
+
+  if (parts.negatives.length) {
+    negatives = `-(${prefix}${parts.negatives.join('|')})`;
+  }
+
+  if (positives && negatives) {
+    result = `${positives}|${negatives}`;
+  } else {
+    result = positives || negatives;
+  }
+
+  if (options.wrap) {
+    return `(${prefix}${result})`;
+  }
+
+  return result;
+};
+
+const toRange = (a, b, isNumbers, options) => {
+  if (isNumbers) {
+    return toRegexRange(a, b, { wrap: false, ...options });
+  }
+
+  let start = String.fromCharCode(a);
+  if (a === b) return start;
+
+  let stop = String.fromCharCode(b);
+  return `[${start}-${stop}]`;
+};
+
+const toRegex = (start, end, options) => {
+  if (Array.isArray(start)) {
+    let wrap = options.wrap === true;
+    let prefix = options.capture ? '' : '?:';
+    return wrap ? `(${prefix}${start.join('|')})` : start.join('|');
+  }
+  return toRegexRange(start, end, options);
+};
+
+const rangeError = (...args) => {
+  return new RangeError('Invalid range arguments: ' + util.inspect(...args));
+};
+
+const invalidRange = (start, end, options) => {
+  if (options.strictRanges === true) throw rangeError([start, end]);
+  return [];
+};
+
+const invalidStep = (step, options) => {
+  if (options.strictRanges === true) {
+    throw new TypeError(`Expected step "${step}" to be a number`);
+  }
+  return [];
+};
+
+const fillNumbers = (start, end, step = 1, options = {}) => {
+  let a = Number(start);
+  let b = Number(end);
+
+  if (!Number.isInteger(a) || !Number.isInteger(b)) {
+    if (options.strictRanges === true) throw rangeError([start, end]);
+    return [];
+  }
+
+  // fix negative zero
+  if (a === 0) a = 0;
+  if (b === 0) b = 0;
+
+  let descending = a > b;
+  let startString = String(start);
+  let endString = String(end);
+  let stepString = String(step);
+  step = Math.max(Math.abs(step), 1);
+
+  let padded = zeros(startString) || zeros(endString) || zeros(stepString);
+  let maxLen = padded ? Math.max(startString.length, endString.length, stepString.length) : 0;
+  let toNumber = padded === false && stringify(start, end, options) === false;
+  let format = options.transform || transform(toNumber);
+
+  if (options.toRegex && step === 1) {
+    return toRange(toMaxLen(start, maxLen), toMaxLen(end, maxLen), true, options);
+  }
+
+  let parts = { negatives: [], positives: [] };
+  let push = num => parts[num < 0 ? 'negatives' : 'positives'].push(Math.abs(num));
+  let range = [];
+  let index = 0;
+
+  while (descending ? a >= b : a <= b) {
+    if (options.toRegex === true && step > 1) {
+      push(a);
+    } else {
+      range.push(pad(format(a, index), maxLen, toNumber));
+    }
+    a = descending ? a - step : a + step;
+    index++;
+  }
+
+  if (options.toRegex === true) {
+    return step > 1
+      ? toSequence(parts, options)
+      : toRegex(range, null, { wrap: false, ...options });
+  }
+
+  return range;
+};
+
+const fillLetters = (start, end, step = 1, options = {}) => {
+  if ((!isNumber(start) && start.length > 1) || (!isNumber(end) && end.length > 1)) {
+    return invalidRange(start, end, options);
+  }
+
+
+  let format = options.transform || (val => String.fromCharCode(val));
+  let a = `${start}`.charCodeAt(0);
+  let b = `${end}`.charCodeAt(0);
+
+  let descending = a > b;
+  let min = Math.min(a, b);
+  let max = Math.max(a, b);
+
+  if (options.toRegex && step === 1) {
+    return toRange(min, max, false, options);
+  }
+
+  let range = [];
+  let index = 0;
+
+  while (descending ? a >= b : a <= b) {
+    range.push(format(a, index));
+    a = descending ? a - step : a + step;
+    index++;
+  }
+
+  if (options.toRegex === true) {
+    return toRegex(range, null, { wrap: false, options });
+  }
+
+  return range;
+};
+
+const fill = (start, end, step, options = {}) => {
+  if (end == null && isValidValue(start)) {
+    return [start];
+  }
+
+  if (!isValidValue(start) || !isValidValue(end)) {
+    return invalidRange(start, end, options);
+  }
+
+  if (typeof step === 'function') {
+    return fill(start, end, 1, { transform: step });
+  }
+
+  if (isObject(step)) {
+    return fill(start, end, 0, step);
+  }
+
+  let opts = { ...options };
+  if (opts.capture === true) opts.wrap = true;
+  step = step || opts.step || 1;
+
+  if (!isNumber(step)) {
+    if (step != null && !isObject(step)) return invalidStep(step, opts);
+    return fill(start, end, 1, step);
+  }
+
+  if (isNumber(start) && isNumber(end)) {
+    return fillNumbers(start, end, step, opts);
+  }
+
+  return fillLetters(start, end, Math.max(Math.abs(step), 1), opts);
+};
+
+module.exports = fill;
+
+
+/***/ }),
 /* 206 */,
 /* 207 */,
 /* 208 */,
@@ -4978,32 +5761,9 @@ exports.createDirentFromStats = createDirentFromStats;
 
 /***/ }),
 /* 211 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
+/***/ (function(module) {
 
-"use strict";
-
-
-Object.defineProperty(exports, '__esModule', { value: true });
-
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
-
-var osName = _interopDefault(__webpack_require__(2));
-
-function getUserAgent() {
-  try {
-    return `Node.js/${process.version.substr(1)} (${osName()}; ${process.arch})`;
-  } catch (error) {
-    if (/wmic os get Caption/.test(error.message)) {
-      return "Windows <version undetectable>";
-    }
-
-    throw error;
-  }
-}
-
-exports.getUserAgent = getUserAgent;
-//# sourceMappingURL=index.js.map
-
+module.exports = require("https");
 
 /***/ }),
 /* 212 */,
@@ -5012,7 +5772,7 @@ exports.getUserAgent = getUserAgent;
 /* 215 */
 /***/ (function(module) {
 
-module.exports = {"_args":[["@octokit/rest@16.28.9","/data/workspace/xresloader/upload-to-github-release"]],"_from":"@octokit/rest@16.28.9","_id":"@octokit/rest@16.28.9","_inBundle":false,"_integrity":"sha512-IKGnX+Tvzt7XHhs8f4ajqxyJvYAMNX5nWfoJm4CQj8LZToMiaJgutf5KxxpxoC3y5w7JTJpW5rnWnF4TsIvCLA==","_location":"/@octokit/rest","_phantomChildren":{"os-name":"3.1.0"},"_requested":{"type":"version","registry":true,"raw":"@octokit/rest@16.28.9","name":"@octokit/rest","escapedName":"@octokit%2frest","scope":"@octokit","rawSpec":"16.28.9","saveSpec":null,"fetchSpec":"16.28.9"},"_requiredBy":["/@actions/github"],"_resolved":"http://mirrors.tencent.com/npm/@octokit%2frest/-/rest-16.28.9.tgz","_spec":"16.28.9","_where":"/data/workspace/xresloader/upload-to-github-release","author":{"name":"Gregor Martynus","url":"https://github.com/gr2m"},"bugs":{"url":"https://github.com/octokit/rest.js/issues"},"bundlesize":[{"path":"./dist/octokit-rest.min.js.gz","maxSize":"33 kB"}],"contributors":[{"name":"Mike de Boer","email":"info@mikedeboer.nl"},{"name":"Fabian Jakobs","email":"fabian@c9.io"},{"name":"Joe Gallo","email":"joe@brassafrax.com"},{"name":"Gregor Martynus","url":"https://github.com/gr2m"}],"dependencies":{"@octokit/request":"^5.0.0","@octokit/request-error":"^1.0.2","atob-lite":"^2.0.0","before-after-hook":"^2.0.0","btoa-lite":"^1.0.0","deprecation":"^2.0.0","lodash.get":"^4.4.2","lodash.set":"^4.3.2","lodash.uniq":"^4.5.0","octokit-pagination-methods":"^1.1.0","once":"^1.4.0","universal-user-agent":"^4.0.0"},"description":"GitHub REST API client for Node.js","devDependencies":{"@gimenete/type-writer":"^0.1.3","@octokit/fixtures-server":"^5.0.1","@octokit/routes":"20.9.2","@types/node":"^12.0.0","bundlesize":"^0.18.0","chai":"^4.1.2","compression-webpack-plugin":"^3.0.0","coveralls":"^3.0.0","glob":"^7.1.2","http-proxy-agent":"^2.1.0","lodash.camelcase":"^4.3.0","lodash.merge":"^4.6.1","lodash.upperfirst":"^4.3.1","mkdirp":"^0.5.1","mocha":"^6.0.0","mustache":"^3.0.0","nock":"^10.0.0","npm-run-all":"^4.1.2","nyc":"^14.0.0","prettier":"^1.14.2","proxy":"^0.2.4","semantic-release":"^15.0.0","sinon":"^7.2.4","sinon-chai":"^3.0.0","sort-keys":"^4.0.0","standard":"^14.0.2","string-to-arraybuffer":"^1.0.0","string-to-jsdoc-comment":"^1.0.0","typescript":"^3.3.1","webpack":"^4.0.0","webpack-bundle-analyzer":"^3.0.0","webpack-cli":"^3.0.0"},"files":["index.js","index.d.ts","lib","plugins"],"homepage":"https://github.com/octokit/rest.js#readme","keywords":["octokit","github","rest","api-client"],"license":"MIT","name":"@octokit/rest","nyc":{"ignore":["test"]},"publishConfig":{"access":"public"},"release":{"publish":["@semantic-release/npm",{"path":"@semantic-release/github","assets":["dist/*","!dist/*.map.gz"]}]},"repository":{"type":"git","url":"git+https://github.com/octokit/rest.js.git"},"scripts":{"build":"npm-run-all build:*","build:browser":"npm-run-all build:browser:*","build:browser:development":"webpack --mode development --entry . --output-library=Octokit --output=./dist/octokit-rest.js --profile --json > dist/bundle-stats.json","build:browser:production":"webpack --mode production --entry . --plugin=compression-webpack-plugin --output-library=Octokit --output-path=./dist --output-filename=octokit-rest.min.js --devtool source-map","build:ts":"node scripts/generate-types","coverage":"nyc report --reporter=html && open coverage/index.html","generate-bundle-report":"webpack-bundle-analyzer dist/bundle-stats.json --mode=static --no-open --report dist/bundle-report.html","generate-routes":"node scripts/generate-routes","postvalidate:ts":"tsc --noEmit --target es6 test/typescript-validate.ts","prebuild:browser":"mkdirp dist/","pretest":"standard","prevalidate:ts":"npm run -s build:ts","start-fixtures-server":"octokit-fixtures-server","test":"nyc mocha test/mocha-node-setup.js \"test/*/**/*-test.js\"","test:browser":"cypress run --browser chrome","test:memory":"mocha test/memory-test","validate:ts":"tsc --target es6 --noImplicitAny index.d.ts"},"standard":{"globals":["describe","before","beforeEach","afterEach","after","it","expect","cy"],"ignore":["/docs"]},"types":"index.d.ts","version":"16.28.9"};
+module.exports = {"name":"@octokit/rest","version":"16.28.9","publishConfig":{"access":"public"},"description":"GitHub REST API client for Node.js","keywords":["octokit","github","rest","api-client"],"author":"Gregor Martynus (https://github.com/gr2m)","contributors":[{"name":"Mike de Boer","email":"info@mikedeboer.nl"},{"name":"Fabian Jakobs","email":"fabian@c9.io"},{"name":"Joe Gallo","email":"joe@brassafrax.com"},{"name":"Gregor Martynus","url":"https://github.com/gr2m"}],"repository":"https://github.com/octokit/rest.js","dependencies":{"@octokit/request":"^5.0.0","@octokit/request-error":"^1.0.2","atob-lite":"^2.0.0","before-after-hook":"^2.0.0","btoa-lite":"^1.0.0","deprecation":"^2.0.0","lodash.get":"^4.4.2","lodash.set":"^4.3.2","lodash.uniq":"^4.5.0","octokit-pagination-methods":"^1.1.0","once":"^1.4.0","universal-user-agent":"^4.0.0"},"devDependencies":{"@gimenete/type-writer":"^0.1.3","@octokit/fixtures-server":"^5.0.1","@octokit/routes":"20.9.2","@types/node":"^12.0.0","bundlesize":"^0.18.0","chai":"^4.1.2","compression-webpack-plugin":"^3.0.0","coveralls":"^3.0.0","glob":"^7.1.2","http-proxy-agent":"^2.1.0","lodash.camelcase":"^4.3.0","lodash.merge":"^4.6.1","lodash.upperfirst":"^4.3.1","mkdirp":"^0.5.1","mocha":"^6.0.0","mustache":"^3.0.0","nock":"^10.0.0","npm-run-all":"^4.1.2","nyc":"^14.0.0","prettier":"^1.14.2","proxy":"^0.2.4","semantic-release":"^15.0.0","sinon":"^7.2.4","sinon-chai":"^3.0.0","sort-keys":"^4.0.0","standard":"^14.0.2","string-to-arraybuffer":"^1.0.0","string-to-jsdoc-comment":"^1.0.0","typescript":"^3.3.1","webpack":"^4.0.0","webpack-bundle-analyzer":"^3.0.0","webpack-cli":"^3.0.0"},"types":"index.d.ts","scripts":{"coverage":"nyc report --reporter=html && open coverage/index.html","pretest":"standard","test":"nyc mocha test/mocha-node-setup.js \"test/*/**/*-test.js\"","test:browser":"cypress run --browser chrome","test:memory":"mocha test/memory-test","build":"npm-run-all build:*","build:ts":"node scripts/generate-types","prebuild:browser":"mkdirp dist/","build:browser":"npm-run-all build:browser:*","build:browser:development":"webpack --mode development --entry . --output-library=Octokit --output=./dist/octokit-rest.js --profile --json > dist/bundle-stats.json","build:browser:production":"webpack --mode production --entry . --plugin=compression-webpack-plugin --output-library=Octokit --output-path=./dist --output-filename=octokit-rest.min.js --devtool source-map","generate-bundle-report":"webpack-bundle-analyzer dist/bundle-stats.json --mode=static --no-open --report dist/bundle-report.html","generate-routes":"node scripts/generate-routes","prevalidate:ts":"npm run -s build:ts","validate:ts":"tsc --target es6 --noImplicitAny index.d.ts","postvalidate:ts":"tsc --noEmit --target es6 test/typescript-validate.ts","start-fixtures-server":"octokit-fixtures-server"},"license":"MIT","files":["index.js","index.d.ts","lib","plugins"],"nyc":{"ignore":["test"]},"release":{"publish":["@semantic-release/npm",{"path":"@semantic-release/github","assets":["dist/*","!dist/*.map.gz"]}]},"standard":{"globals":["describe","before","beforeEach","afterEach","after","it","expect","cy"],"ignore":["/docs"]},"bundlesize":[{"path":"./dist/octokit-rest.min.js.gz","maxSize":"33 kB"}]};
 
 /***/ }),
 /* 216 */,
@@ -5073,466 +5833,9 @@ exports.escapeLast = (input, char, lastIdx) => {
 
 
 /***/ }),
-/* 225 */
-/***/ (function(__unusedmodule, exports) {
-
-"use strict";
-
-
-exports.isInteger = num => {
-  if (typeof num === 'number') {
-    return Number.isInteger(num);
-  }
-  if (typeof num === 'string' && num.trim() !== '') {
-    return Number.isInteger(Number(num));
-  }
-  return false;
-};
-
-/**
- * Find a node of the given type
- */
-
-exports.find = (node, type) => node.nodes.find(node => node.type === type);
-
-/**
- * Find a node of the given type
- */
-
-exports.exceedsLimit = (min, max, step = 1, limit) => {
-  if (limit === false) return false;
-  if (!exports.isInteger(min) || !exports.isInteger(max)) return false;
-  return ((Number(max) - Number(min)) / Number(step)) >= limit;
-};
-
-/**
- * Escape the given node with '\\' before node.value
- */
-
-exports.escapeNode = (block, n = 0, type) => {
-  let node = block.nodes[n];
-  if (!node) return;
-
-  if ((type && node.type === type) || node.type === 'open' || node.type === 'close') {
-    if (node.escaped !== true) {
-      node.value = '\\' + node.value;
-      node.escaped = true;
-    }
-  }
-};
-
-/**
- * Returns true if the given brace node should be enclosed in literal braces
- */
-
-exports.encloseBrace = node => {
-  if (node.type !== 'brace') return false;
-  if ((node.commas >> 0 + node.ranges >> 0) === 0) {
-    node.invalid = true;
-    return true;
-  }
-  return false;
-};
-
-/**
- * Returns true if a brace node is invalid.
- */
-
-exports.isInvalidBrace = block => {
-  if (block.type !== 'brace') return false;
-  if (block.invalid === true || block.dollar) return true;
-  if ((block.commas >> 0 + block.ranges >> 0) === 0) {
-    block.invalid = true;
-    return true;
-  }
-  if (block.open !== true || block.close !== true) {
-    block.invalid = true;
-    return true;
-  }
-  return false;
-};
-
-/**
- * Returns true if a node is an open or close node
- */
-
-exports.isOpenOrClose = node => {
-  if (node.type === 'open' || node.type === 'close') {
-    return true;
-  }
-  return node.open === true || node.close === true;
-};
-
-/**
- * Reduce an array of text nodes.
- */
-
-exports.reduce = nodes => nodes.reduce((acc, node) => {
-  if (node.type === 'text') acc.push(node.value);
-  if (node.type === 'range') node.type = 'text';
-  return acc;
-}, []);
-
-/**
- * Flatten an array
- */
-
-exports.flatten = (...args) => {
-  const result = [];
-  const flat = arr => {
-    for (let i = 0; i < arr.length; i++) {
-      let ele = arr[i];
-      Array.isArray(ele) ? flat(ele, result) : ele !== void 0 && result.push(ele);
-    }
-    return result;
-  };
-  flat(args);
-  return result;
-};
-
-
-/***/ }),
+/* 225 */,
 /* 226 */,
-/* 227 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const stringify = __webpack_require__(382);
-
-/**
- * Constants
- */
-
-const {
-  MAX_LENGTH,
-  CHAR_BACKSLASH, /* \ */
-  CHAR_BACKTICK, /* ` */
-  CHAR_COMMA, /* , */
-  CHAR_DOT, /* . */
-  CHAR_LEFT_PARENTHESES, /* ( */
-  CHAR_RIGHT_PARENTHESES, /* ) */
-  CHAR_LEFT_CURLY_BRACE, /* { */
-  CHAR_RIGHT_CURLY_BRACE, /* } */
-  CHAR_LEFT_SQUARE_BRACKET, /* [ */
-  CHAR_RIGHT_SQUARE_BRACKET, /* ] */
-  CHAR_DOUBLE_QUOTE, /* " */
-  CHAR_SINGLE_QUOTE, /* ' */
-  CHAR_NO_BREAK_SPACE,
-  CHAR_ZERO_WIDTH_NOBREAK_SPACE
-} = __webpack_require__(154);
-
-/**
- * parse
- */
-
-const parse = (input, options = {}) => {
-  if (typeof input !== 'string') {
-    throw new TypeError('Expected a string');
-  }
-
-  let opts = options || {};
-  let max = typeof opts.maxLength === 'number' ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
-  if (input.length > max) {
-    throw new SyntaxError(`Input length (${input.length}), exceeds max characters (${max})`);
-  }
-
-  let ast = { type: 'root', input, nodes: [] };
-  let stack = [ast];
-  let block = ast;
-  let prev = ast;
-  let brackets = 0;
-  let length = input.length;
-  let index = 0;
-  let depth = 0;
-  let value;
-  let memo = {};
-
-  /**
-   * Helpers
-   */
-
-  const advance = () => input[index++];
-  const push = node => {
-    if (node.type === 'text' && prev.type === 'dot') {
-      prev.type = 'text';
-    }
-
-    if (prev && prev.type === 'text' && node.type === 'text') {
-      prev.value += node.value;
-      return;
-    }
-
-    block.nodes.push(node);
-    node.parent = block;
-    node.prev = prev;
-    prev = node;
-    return node;
-  };
-
-  push({ type: 'bos' });
-
-  while (index < length) {
-    block = stack[stack.length - 1];
-    value = advance();
-
-    /**
-     * Invalid chars
-     */
-
-    if (value === CHAR_ZERO_WIDTH_NOBREAK_SPACE || value === CHAR_NO_BREAK_SPACE) {
-      continue;
-    }
-
-    /**
-     * Escaped chars
-     */
-
-    if (value === CHAR_BACKSLASH) {
-      push({ type: 'text', value: (options.keepEscaping ? value : '') + advance() });
-      continue;
-    }
-
-    /**
-     * Right square bracket (literal): ']'
-     */
-
-    if (value === CHAR_RIGHT_SQUARE_BRACKET) {
-      push({ type: 'text', value: '\\' + value });
-      continue;
-    }
-
-    /**
-     * Left square bracket: '['
-     */
-
-    if (value === CHAR_LEFT_SQUARE_BRACKET) {
-      brackets++;
-
-      let closed = true;
-      let next;
-
-      while (index < length && (next = advance())) {
-        value += next;
-
-        if (next === CHAR_LEFT_SQUARE_BRACKET) {
-          brackets++;
-          continue;
-        }
-
-        if (next === CHAR_BACKSLASH) {
-          value += advance();
-          continue;
-        }
-
-        if (next === CHAR_RIGHT_SQUARE_BRACKET) {
-          brackets--;
-
-          if (brackets === 0) {
-            break;
-          }
-        }
-      }
-
-      push({ type: 'text', value });
-      continue;
-    }
-
-    /**
-     * Parentheses
-     */
-
-    if (value === CHAR_LEFT_PARENTHESES) {
-      block = push({ type: 'paren', nodes: [] });
-      stack.push(block);
-      push({ type: 'text', value });
-      continue;
-    }
-
-    if (value === CHAR_RIGHT_PARENTHESES) {
-      if (block.type !== 'paren') {
-        push({ type: 'text', value });
-        continue;
-      }
-      block = stack.pop();
-      push({ type: 'text', value });
-      block = stack[stack.length - 1];
-      continue;
-    }
-
-    /**
-     * Quotes: '|"|`
-     */
-
-    if (value === CHAR_DOUBLE_QUOTE || value === CHAR_SINGLE_QUOTE || value === CHAR_BACKTICK) {
-      let open = value;
-      let next;
-
-      if (options.keepQuotes !== true) {
-        value = '';
-      }
-
-      while (index < length && (next = advance())) {
-        if (next === CHAR_BACKSLASH) {
-          value += next + advance();
-          continue;
-        }
-
-        if (next === open) {
-          if (options.keepQuotes === true) value += next;
-          break;
-        }
-
-        value += next;
-      }
-
-      push({ type: 'text', value });
-      continue;
-    }
-
-    /**
-     * Left curly brace: '{'
-     */
-
-    if (value === CHAR_LEFT_CURLY_BRACE) {
-      depth++;
-
-      let dollar = prev.value && prev.value.slice(-1) === '$' || block.dollar === true;
-      let brace = {
-        type: 'brace',
-        open: true,
-        close: false,
-        dollar,
-        depth,
-        commas: 0,
-        ranges: 0,
-        nodes: []
-      };
-
-      block = push(brace);
-      stack.push(block);
-      push({ type: 'open', value });
-      continue;
-    }
-
-    /**
-     * Right curly brace: '}'
-     */
-
-    if (value === CHAR_RIGHT_CURLY_BRACE) {
-      if (block.type !== 'brace') {
-        push({ type: 'text', value });
-        continue;
-      }
-
-      let type = 'close';
-      block = stack.pop();
-      block.close = true;
-
-      push({ type, value });
-      depth--;
-
-      block = stack[stack.length - 1];
-      continue;
-    }
-
-    /**
-     * Comma: ','
-     */
-
-    if (value === CHAR_COMMA && depth > 0) {
-      if (block.ranges > 0) {
-        block.ranges = 0;
-        let open = block.nodes.shift();
-        block.nodes = [open, { type: 'text', value: stringify(block) }];
-      }
-
-      push({ type: 'comma', value });
-      block.commas++;
-      continue;
-    }
-
-    /**
-     * Dot: '.'
-     */
-
-    if (value === CHAR_DOT && depth > 0 && block.commas === 0) {
-      let siblings = block.nodes;
-
-      if (depth === 0 || siblings.length === 0) {
-        push({ type: 'text', value });
-        continue;
-      }
-
-      if (prev.type === 'dot') {
-        block.range = [];
-        prev.value += value;
-        prev.type = 'range';
-
-        if (block.nodes.length !== 3 && block.nodes.length !== 5) {
-          block.invalid = true;
-          block.ranges = 0;
-          prev.type = 'text';
-          continue;
-        }
-
-        block.ranges++;
-        block.args = [];
-        continue;
-      }
-
-      if (prev.type === 'range') {
-        siblings.pop();
-
-        let before = siblings[siblings.length - 1];
-        before.value += prev.value + value;
-        prev = before;
-        block.ranges--;
-        continue;
-      }
-
-      push({ type: 'dot', value });
-      continue;
-    }
-
-    /**
-     * Text
-     */
-
-    push({ type: 'text', value });
-  }
-
-  // Mark imbalanced braces and brackets as invalid
-  do {
-    block = stack.pop();
-
-    if (block.type !== 'root') {
-      block.nodes.forEach(node => {
-        if (!node.nodes) {
-          if (node.type === 'open') node.isOpen = true;
-          if (node.type === 'close') node.isClose = true;
-          if (!node.nodes) node.type = 'text';
-          node.invalid = true;
-        }
-      });
-
-      // get the location of the block on parent.nodes (block's siblings)
-      let parent = stack[stack.length - 1];
-      let index = parent.nodes.indexOf(block);
-      // replace the (invalid) block with it's nodes
-      parent.nodes.splice(index, 1, ...block.nodes);
-    }
-  } while (stack.length > 0);
-
-  push({ type: 'eos' });
-  return ast;
-};
-
-module.exports = parse;
-
-
-/***/ }),
+/* 227 */,
 /* 228 */,
 /* 229 */,
 /* 230 */
@@ -7958,7 +8261,31 @@ function range(a, b, str) {
 /* 287 */,
 /* 288 */,
 /* 289 */,
-/* 290 */,
+/* 290 */
+/***/ (function(module) {
+
+"use strict";
+/*!
+ * is-number <https://github.com/jonschlinkert/is-number>
+ *
+ * Copyright (c) 2014-present, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+
+
+module.exports = function(num) {
+  if (typeof num === 'number') {
+    return num - num === 0;
+  }
+  if (typeof num === 'string' && num.trim() !== '') {
+    return Number.isFinite ? Number.isFinite(+num) : isFinite(+num);
+  }
+  return false;
+};
+
+
+/***/ }),
 /* 291 */
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -8119,7 +8446,7 @@ function authenticationRequestError (state, error, options) {
 module.exports = parseOptions
 
 const { Deprecation } = __webpack_require__(692)
-const { getUserAgent } = __webpack_require__(619)
+const { getUserAgent } = __webpack_require__(796)
 const once = __webpack_require__(969)
 
 const pkg = __webpack_require__(215)
@@ -8656,7 +8983,7 @@ function octokitRestNormalizeGitReferenceResponses (octokit) {
 /* 314 */
 /***/ (function(module) {
 
-module.exports = {"_args":[["@octokit/graphql@2.1.3","/data/workspace/xresloader/upload-to-github-release"]],"_from":"@octokit/graphql@2.1.3","_id":"@octokit/graphql@2.1.3","_inBundle":false,"_integrity":"sha512-XoXJqL2ondwdnMIW3wtqJWEwcBfKk37jO/rYkoxNPEVeLBDGsGO1TCWggrAlq3keGt/O+C/7VepXnukUxwt5vA==","_location":"/@octokit/graphql","_phantomChildren":{},"_requested":{"type":"version","registry":true,"raw":"@octokit/graphql@2.1.3","name":"@octokit/graphql","escapedName":"@octokit%2fgraphql","scope":"@octokit","rawSpec":"2.1.3","saveSpec":null,"fetchSpec":"2.1.3"},"_requiredBy":["/@actions/github"],"_resolved":"http://mirrors.tencent.com/npm/@octokit%2fgraphql/-/graphql-2.1.3.tgz","_spec":"2.1.3","_where":"/data/workspace/xresloader/upload-to-github-release","author":{"name":"Gregor Martynus","url":"https://github.com/gr2m"},"bugs":{"url":"https://github.com/octokit/graphql.js/issues"},"bundlesize":[{"path":"./dist/octokit-graphql.min.js.gz","maxSize":"5KB"}],"dependencies":{"@octokit/request":"^5.0.0","universal-user-agent":"^2.0.3"},"description":"GitHub GraphQL API client for browsers and Node","devDependencies":{"chai":"^4.2.0","compression-webpack-plugin":"^2.0.0","coveralls":"^3.0.3","cypress":"^3.1.5","fetch-mock":"^7.3.1","mkdirp":"^0.5.1","mocha":"^6.0.0","npm-run-all":"^4.1.3","nyc":"^14.0.0","semantic-release":"^15.13.3","simple-mock":"^0.8.0","standard":"^12.0.1","webpack":"^4.29.6","webpack-bundle-analyzer":"^3.1.0","webpack-cli":"^3.2.3"},"files":["lib"],"homepage":"https://github.com/octokit/graphql.js#readme","keywords":["octokit","github","api","graphql"],"license":"MIT","main":"index.js","name":"@octokit/graphql","publishConfig":{"access":"public"},"release":{"publish":["@semantic-release/npm",{"path":"@semantic-release/github","assets":["dist/*","!dist/*.map.gz"]}]},"repository":{"type":"git","url":"git+https://github.com/octokit/graphql.js.git"},"scripts":{"build":"npm-run-all build:*","build:development":"webpack --mode development --entry . --output-library=octokitGraphql --output=./dist/octokit-graphql.js --profile --json > dist/bundle-stats.json","build:production":"webpack --mode production --entry . --plugin=compression-webpack-plugin --output-library=octokitGraphql --output-path=./dist --output-filename=octokit-graphql.min.js --devtool source-map","bundle-report":"webpack-bundle-analyzer dist/bundle-stats.json --mode=static --no-open --report dist/bundle-report.html","coverage":"nyc report --reporter=html && open coverage/index.html","coverage:upload":"nyc report --reporter=text-lcov | coveralls","prebuild":"mkdirp dist/","pretest":"standard","test":"nyc mocha test/*-test.js","test:browser":"cypress run --browser chrome"},"standard":{"globals":["describe","before","beforeEach","afterEach","after","it","expect"]},"version":"2.1.3"};
+module.exports = {"name":"@octokit/graphql","version":"2.1.3","publishConfig":{"access":"public"},"description":"GitHub GraphQL API client for browsers and Node","main":"index.js","scripts":{"prebuild":"mkdirp dist/","build":"npm-run-all build:*","build:development":"webpack --mode development --entry . --output-library=octokitGraphql --output=./dist/octokit-graphql.js --profile --json > dist/bundle-stats.json","build:production":"webpack --mode production --entry . --plugin=compression-webpack-plugin --output-library=octokitGraphql --output-path=./dist --output-filename=octokit-graphql.min.js --devtool source-map","bundle-report":"webpack-bundle-analyzer dist/bundle-stats.json --mode=static --no-open --report dist/bundle-report.html","coverage":"nyc report --reporter=html && open coverage/index.html","coverage:upload":"nyc report --reporter=text-lcov | coveralls","pretest":"standard","test":"nyc mocha test/*-test.js","test:browser":"cypress run --browser chrome"},"repository":{"type":"git","url":"https://github.com/octokit/graphql.js.git"},"keywords":["octokit","github","api","graphql"],"author":"Gregor Martynus (https://github.com/gr2m)","license":"MIT","bugs":{"url":"https://github.com/octokit/graphql.js/issues"},"homepage":"https://github.com/octokit/graphql.js#readme","dependencies":{"@octokit/request":"^5.0.0","universal-user-agent":"^2.0.3"},"devDependencies":{"chai":"^4.2.0","compression-webpack-plugin":"^2.0.0","coveralls":"^3.0.3","cypress":"^3.1.5","fetch-mock":"^7.3.1","mkdirp":"^0.5.1","mocha":"^6.0.0","npm-run-all":"^4.1.3","nyc":"^14.0.0","semantic-release":"^15.13.3","simple-mock":"^0.8.0","standard":"^12.0.1","webpack":"^4.29.6","webpack-bundle-analyzer":"^3.1.0","webpack-cli":"^3.2.3"},"bundlesize":[{"path":"./dist/octokit-graphql.min.js.gz","maxSize":"5KB"}],"release":{"publish":["@semantic-release/npm",{"path":"@semantic-release/github","assets":["dist/*","!dist/*.map.gz"]}]},"standard":{"globals":["describe","before","beforeEach","afterEach","after","it","expect"]},"files":["lib"]};
 
 /***/ }),
 /* 315 */
@@ -8810,51 +9137,13 @@ function run() {
             console.log(`context.payload = ${JSON.stringify(action_github.context.payload, undefined, 2)}`);
             console.log(`context.eventName = ${action_github.context.eventName}`);
             console.log(`context.sha = ${action_github.context.sha}`);
-            // context.ref = refs/heads/BRANCH_NAME  or refs/tags/TAG_NAME   
             console.log(`context.ref = ${action_github.context.ref}`);
             console.log(`context.action = ${action_github.context.action}`);
             console.log(`context.actor = ${action_github.context.actor}`);
             console.log(`context.repo.repo = ${action_github.context.repo.repo}`);
             console.log(`context.repo.owner = ${action_github.context.repo.owner}`);
-            // context.eventName = push
-            // context.sha = ae7dc58d20ad51b3c8c37deca1bc07f3ae8526cd
-            // context.ref = refs/heads/master
-            // context.action = xresloaderupload-to-github-release
-            // context.actor = owt5008137
-            // context.repo.repo = upload-to-github-release-test
-            // context.repo.owner = xresloader
-            var release_name = action_github.context.sha.substr(0, 8);
-            if (with_branches || with_tags) {
-                // check branches or tags
-                var match_filter = false;
-                if (with_tags) {
-                    const match_tag = action_github.context.ref.match(/refs\/tags\/(.*)/);
-                    if (match_tag) {
-                        match_filter = true;
-                        release_name = match_tag[1];
-                    }
-                    else {
-                        console.log('Current event is not a tag push.');
-                    }
-                }
-                if (!match_filter && with_branches) {
-                    const match_branch = action_github.context.ref.match(/refs\/heads\/(.*)/);
-                    if (match_branch) {
-                        const selected_branch = with_branches.filter((s) => s == match_branch[1]);
-                        if (selected_branch) {
-                            match_filter = true;
-                            release_name = match_branch[1] + '-' + release_name;
-                        }
-                    }
-                    if (!match_filter) {
-                        console.log(`Current event is not one of branches [${with_branches.join(", ")}].`);
-                    }
-                }
-                if (!match_filter) {
-                    console.log(`Current event will be skipped.`);
-                    return;
-                }
-            }
+            // if (with_branches)
+            // if (with_tags)
             const upload_files = yield globby_1.default(upload_files_pattern);
             console.log(`Files to upload: ${upload_files}!`);
             if (!upload_files) {
@@ -8864,7 +9153,8 @@ function run() {
             // request github release
             const octokit = new action_github.GitHub(github_token);
             // Debug Tool: https://developer.github.com/v4/explorer
-            const repo_info = yield octokit.graphql(`query {
+            const repo_info = yield octokit.graphql(`
+            query {
                 repository (owner:"xresloader", name:"xresloader") { 
                     release (tagName: "v2.5.0") {
                     id,
@@ -8890,7 +9180,7 @@ function run() {
                 }
             }`);
             console.log("============================= v4 API: graphql(query {repository}) =============================");
-            console.log(`repo_info = ${repo_info} => ${JSON.stringify(repo_info)}`);
+            action_core.debug(repo_info);
             // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
             const check_release = yield octokit.repos.getReleaseByTag({
                 owner: "xresloader",
@@ -8898,9 +9188,9 @@ function run() {
                 tag: "v2.5.0"
             });
             console.log("============================= v3 API: getReleaseByTag =============================");
-            console.log(`getReleaseByTag.headers = ${JSON.stringify(check_release.headers)}`);
-            console.log(`getReleaseByTag.status = ${check_release.status}`);
-            console.log(`getReleaseByTag.data = ${JSON.stringify(check_release.data)}`);
+            action_core.debug(`getReleaseByTag.headers = ${JSON.stringify(check_release.headers)}`);
+            action_core.debug(`getReleaseByTag.status = ${check_release.status}`);
+            action_core.debug(`getReleaseByTag.data = ${JSON.stringify(check_release.data)}`);
             // set output
             const time = (new Date()).toTimeString();
             action_core.setOutput("time", time);
@@ -9638,45 +9928,7 @@ exports.default = ErrorFilter;
 /* 379 */,
 /* 380 */,
 /* 381 */,
-/* 382 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const utils = __webpack_require__(225);
-
-module.exports = (ast, options = {}) => {
-  let stringify = (node, parent = {}) => {
-    let invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
-    let invalidNode = node.invalid === true && options.escapeInvalid === true;
-    let output = '';
-
-    if (node.value) {
-      if ((invalidBlock || invalidNode) && utils.isOpenOrClose(node)) {
-        return '\\' + node.value;
-      }
-      return node.value;
-    }
-
-    if (node.value) {
-      return node.value;
-    }
-
-    if (node.nodes) {
-      for (let child of node.nodes) {
-        output += stringify(child);
-      }
-    }
-    return output;
-  };
-
-  return stringify(ast);
-};
-
-
-
-/***/ }),
+/* 382 */,
 /* 383 */,
 /* 384 */
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
@@ -9762,8 +10014,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var isPlainObject = _interopDefault(__webpack_require__(696));
-var universalUserAgent = __webpack_require__(562);
+var isPlainObject = _interopDefault(__webpack_require__(626));
+var universalUserAgent = __webpack_require__(796);
 
 function lowercaseKeys(object) {
   if (!object) {
@@ -11178,70 +11430,7 @@ function escape(s) {
 /* 432 */,
 /* 433 */,
 /* 434 */,
-/* 435 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const fill = __webpack_require__(730);
-const utils = __webpack_require__(225);
-
-const compile = (ast, options = {}) => {
-  let walk = (node, parent = {}) => {
-    let invalidBlock = utils.isInvalidBrace(parent);
-    let invalidNode = node.invalid === true && options.escapeInvalid === true;
-    let invalid = invalidBlock === true || invalidNode === true;
-    let prefix = options.escapeInvalid === true ? '\\' : '';
-    let output = '';
-
-    if (node.isOpen === true) {
-      return prefix + node.value;
-    }
-    if (node.isClose === true) {
-      return prefix + node.value;
-    }
-
-    if (node.type === 'open') {
-      return invalid ? (prefix + node.value) : '(';
-    }
-
-    if (node.type === 'close') {
-      return invalid ? (prefix + node.value) : ')';
-    }
-
-    if (node.type === 'comma') {
-      return node.prev.type === 'comma' ? '' : (invalid ? node.value : '|');
-    }
-
-    if (node.value) {
-      return node.value;
-    }
-
-    if (node.nodes && node.ranges > 0) {
-      let args = utils.reduce(node.nodes);
-      let range = fill(...args, { ...options, wrap: false, toRegex: true });
-
-      if (range.length !== 0) {
-        return args.length > 1 && range.length > 1 ? `(${range})` : range;
-      }
-    }
-
-    if (node.nodes) {
-      for (let child of node.nodes) {
-        output += walk(child, node);
-      }
-    }
-    return output;
-  };
-
-  return walk(ast);
-};
-
-module.exports = compile;
-
-
-/***/ }),
+/* 435 */,
 /* 436 */,
 /* 437 */,
 /* 438 */,
@@ -11286,126 +11475,7 @@ module.exports = reusify
 
 
 /***/ }),
-/* 441 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const fill = __webpack_require__(730);
-const stringify = __webpack_require__(382);
-const utils = __webpack_require__(225);
-
-const append = (queue = '', stash = '', enclose = false) => {
-  let result = [];
-
-  queue = [].concat(queue);
-  stash = [].concat(stash);
-
-  if (!stash.length) return queue;
-  if (!queue.length) {
-    return enclose ? utils.flatten(stash).map(ele => `{${ele}}`) : stash;
-  }
-
-  for (let item of queue) {
-    if (Array.isArray(item)) {
-      for (let value of item) {
-        result.push(append(value, stash, enclose));
-      }
-    } else {
-      for (let ele of stash) {
-        if (enclose === true && typeof ele === 'string') ele = `{${ele}}`;
-        result.push(Array.isArray(ele) ? append(item, ele, enclose) : (item + ele));
-      }
-    }
-  }
-  return utils.flatten(result);
-};
-
-const expand = (ast, options = {}) => {
-  let rangeLimit = options.rangeLimit === void 0 ? 1000 : options.rangeLimit;
-
-  let walk = (node, parent = {}) => {
-    node.queue = [];
-
-    let p = parent;
-    let q = parent.queue;
-
-    while (p.type !== 'brace' && p.type !== 'root' && p.parent) {
-      p = p.parent;
-      q = p.queue;
-    }
-
-    if (node.invalid || node.dollar) {
-      q.push(append(q.pop(), stringify(node, options)));
-      return;
-    }
-
-    if (node.type === 'brace' && node.invalid !== true && node.nodes.length === 2) {
-      q.push(append(q.pop(), ['{}']));
-      return;
-    }
-
-    if (node.nodes && node.ranges > 0) {
-      let args = utils.reduce(node.nodes);
-
-      if (utils.exceedsLimit(...args, options.step, rangeLimit)) {
-        throw new RangeError('expanded array length exceeds range limit. Use options.rangeLimit to increase or disable the limit.');
-      }
-
-      let range = fill(...args, options);
-      if (range.length === 0) {
-        range = stringify(node, options);
-      }
-
-      q.push(append(q.pop(), range));
-      node.nodes = [];
-      return;
-    }
-
-    let enclose = utils.encloseBrace(node);
-    let queue = node.queue;
-    let block = node;
-
-    while (block.type !== 'brace' && block.type !== 'root' && block.parent) {
-      block = block.parent;
-      queue = block.queue;
-    }
-
-    for (let i = 0; i < node.nodes.length; i++) {
-      let child = node.nodes[i];
-
-      if (child.type === 'comma' && node.type === 'brace') {
-        if (i === 1) queue.push('');
-        queue.push('');
-        continue;
-      }
-
-      if (child.type === 'close') {
-        q.push(append(q.pop(), queue, enclose));
-        continue;
-      }
-
-      if (child.value && child.type !== 'open') {
-        queue.push(append(queue.pop(), child.value));
-        continue;
-      }
-
-      if (child.nodes) {
-        walk(child, node);
-      }
-    }
-
-    return queue;
-  };
-
-  return utils.flatten(walk(ast));
-};
-
-module.exports = expand;
-
-
-/***/ }),
+/* 441 */,
 /* 442 */,
 /* 443 */,
 /* 444 */
@@ -11538,7 +11608,7 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 var Stream = _interopDefault(__webpack_require__(413));
 var http = _interopDefault(__webpack_require__(605));
 var Url = _interopDefault(__webpack_require__(835));
-var https = _interopDefault(__webpack_require__(34));
+var https = _interopDefault(__webpack_require__(211));
 var zlib = _interopDefault(__webpack_require__(761));
 
 // Based on https://github.com/tmpvar/jsdom/blob/aa85b2abf07766ff7bf5c1f6daafb3726f2f2db5/lib/jsdom/living/blob.js
@@ -13180,7 +13250,70 @@ exports.FetchError = FetchError;
 /* 458 */,
 /* 459 */,
 /* 460 */,
-/* 461 */,
+/* 461 */
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = {
+  MAX_LENGTH: 1024 * 64,
+
+  // Digits
+  CHAR_0: '0', /* 0 */
+  CHAR_9: '9', /* 9 */
+
+  // Alphabet chars.
+  CHAR_UPPERCASE_A: 'A', /* A */
+  CHAR_LOWERCASE_A: 'a', /* a */
+  CHAR_UPPERCASE_Z: 'Z', /* Z */
+  CHAR_LOWERCASE_Z: 'z', /* z */
+
+  CHAR_LEFT_PARENTHESES: '(', /* ( */
+  CHAR_RIGHT_PARENTHESES: ')', /* ) */
+
+  CHAR_ASTERISK: '*', /* * */
+
+  // Non-alphabetic chars.
+  CHAR_AMPERSAND: '&', /* & */
+  CHAR_AT: '@', /* @ */
+  CHAR_BACKSLASH: '\\', /* \ */
+  CHAR_BACKTICK: '`', /* ` */
+  CHAR_CARRIAGE_RETURN: '\r', /* \r */
+  CHAR_CIRCUMFLEX_ACCENT: '^', /* ^ */
+  CHAR_COLON: ':', /* : */
+  CHAR_COMMA: ',', /* , */
+  CHAR_DOLLAR: '$', /* . */
+  CHAR_DOT: '.', /* . */
+  CHAR_DOUBLE_QUOTE: '"', /* " */
+  CHAR_EQUAL: '=', /* = */
+  CHAR_EXCLAMATION_MARK: '!', /* ! */
+  CHAR_FORM_FEED: '\f', /* \f */
+  CHAR_FORWARD_SLASH: '/', /* / */
+  CHAR_HASH: '#', /* # */
+  CHAR_HYPHEN_MINUS: '-', /* - */
+  CHAR_LEFT_ANGLE_BRACKET: '<', /* < */
+  CHAR_LEFT_CURLY_BRACE: '{', /* { */
+  CHAR_LEFT_SQUARE_BRACKET: '[', /* [ */
+  CHAR_LINE_FEED: '\n', /* \n */
+  CHAR_NO_BREAK_SPACE: '\u00A0', /* \u00A0 */
+  CHAR_PERCENT: '%', /* % */
+  CHAR_PLUS: '+', /* + */
+  CHAR_QUESTION_MARK: '?', /* ? */
+  CHAR_RIGHT_ANGLE_BRACKET: '>', /* > */
+  CHAR_RIGHT_CURLY_BRACE: '}', /* } */
+  CHAR_RIGHT_SQUARE_BRACKET: ']', /* ] */
+  CHAR_SEMICOLON: ';', /* ; */
+  CHAR_SINGLE_QUOTE: '\'', /* ' */
+  CHAR_SPACE: ' ', /*   */
+  CHAR_TAB: '\t', /* \t */
+  CHAR_UNDERSCORE: '_', /* _ */
+  CHAR_VERTICAL_LINE: '|', /* | */
+  CHAR_ZERO_WIDTH_NOBREAK_SPACE: '\uFEFF' /* \uFEFF */
+};
+
+
+/***/ }),
 /* 462 */
 /***/ (function(module) {
 
@@ -13796,7 +13929,7 @@ exports.isSymlinkSync = isTypeSync.bind(null, 'lstatSync', 'isSymbolicLink');
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 const { request } = __webpack_require__(753)
-const getUserAgent = __webpack_require__(46)
+const getUserAgent = __webpack_require__(650)
 
 const version = __webpack_require__(314).version
 const userAgent = `octokit-graphql.js/${version} ${getUserAgent()}`
@@ -14050,7 +14183,126 @@ module.exports = factory()
 /* 530 */,
 /* 531 */,
 /* 532 */,
-/* 533 */,
+/* 533 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const fill = __webpack_require__(205);
+const stringify = __webpack_require__(758);
+const utils = __webpack_require__(978);
+
+const append = (queue = '', stash = '', enclose = false) => {
+  let result = [];
+
+  queue = [].concat(queue);
+  stash = [].concat(stash);
+
+  if (!stash.length) return queue;
+  if (!queue.length) {
+    return enclose ? utils.flatten(stash).map(ele => `{${ele}}`) : stash;
+  }
+
+  for (let item of queue) {
+    if (Array.isArray(item)) {
+      for (let value of item) {
+        result.push(append(value, stash, enclose));
+      }
+    } else {
+      for (let ele of stash) {
+        if (enclose === true && typeof ele === 'string') ele = `{${ele}}`;
+        result.push(Array.isArray(ele) ? append(item, ele, enclose) : (item + ele));
+      }
+    }
+  }
+  return utils.flatten(result);
+};
+
+const expand = (ast, options = {}) => {
+  let rangeLimit = options.rangeLimit === void 0 ? 1000 : options.rangeLimit;
+
+  let walk = (node, parent = {}) => {
+    node.queue = [];
+
+    let p = parent;
+    let q = parent.queue;
+
+    while (p.type !== 'brace' && p.type !== 'root' && p.parent) {
+      p = p.parent;
+      q = p.queue;
+    }
+
+    if (node.invalid || node.dollar) {
+      q.push(append(q.pop(), stringify(node, options)));
+      return;
+    }
+
+    if (node.type === 'brace' && node.invalid !== true && node.nodes.length === 2) {
+      q.push(append(q.pop(), ['{}']));
+      return;
+    }
+
+    if (node.nodes && node.ranges > 0) {
+      let args = utils.reduce(node.nodes);
+
+      if (utils.exceedsLimit(...args, options.step, rangeLimit)) {
+        throw new RangeError('expanded array length exceeds range limit. Use options.rangeLimit to increase or disable the limit.');
+      }
+
+      let range = fill(...args, options);
+      if (range.length === 0) {
+        range = stringify(node, options);
+      }
+
+      q.push(append(q.pop(), range));
+      node.nodes = [];
+      return;
+    }
+
+    let enclose = utils.encloseBrace(node);
+    let queue = node.queue;
+    let block = node;
+
+    while (block.type !== 'brace' && block.type !== 'root' && block.parent) {
+      block = block.parent;
+      queue = block.queue;
+    }
+
+    for (let i = 0; i < node.nodes.length; i++) {
+      let child = node.nodes[i];
+
+      if (child.type === 'comma' && node.type === 'brace') {
+        if (i === 1) queue.push('');
+        queue.push('');
+        continue;
+      }
+
+      if (child.type === 'close') {
+        q.push(append(q.pop(), queue, enclose));
+        continue;
+      }
+
+      if (child.value && child.type !== 'open') {
+        queue.push(append(queue.pop(), child.value));
+        continue;
+      }
+
+      if (child.nodes) {
+        walk(child, node);
+      }
+    }
+
+    return queue;
+  };
+
+  return utils.flatten(walk(ast));
+};
+
+module.exports = expand;
+
+
+/***/ }),
 /* 534 */,
 /* 535 */,
 /* 536 */
@@ -14417,7 +14669,61 @@ function pauseStreams (streams, options) {
 /* 545 */,
 /* 546 */,
 /* 547 */,
-/* 548 */,
+/* 548 */
+/***/ (function(module) {
+
+"use strict";
+
+
+/*!
+ * isobject <https://github.com/jonschlinkert/isobject>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObject(val) {
+  return val != null && typeof val === 'object' && Array.isArray(val) === false;
+}
+
+/*!
+ * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObjectObject(o) {
+  return isObject(o) === true
+    && Object.prototype.toString.call(o) === '[object Object]';
+}
+
+function isPlainObject(o) {
+  var ctor,prot;
+
+  if (isObjectObject(o) === false) return false;
+
+  // If has modified constructor
+  ctor = o.constructor;
+  if (typeof ctor !== 'function') return false;
+
+  // If has modified prototype
+  prot = ctor.prototype;
+  if (isObjectObject(prot) === false) return false;
+
+  // If constructor does not have an Object-specific method
+  if (prot.hasOwnProperty('isPrototypeOf') === false) {
+    return false;
+  }
+
+  // Most likely a plain Object
+  return true;
+}
+
+module.exports = isPlainObject;
+
+
+/***/ }),
 /* 549 */,
 /* 550 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -14457,35 +14763,7 @@ function hasPreviousPage (link) {
 /* 559 */,
 /* 560 */,
 /* 561 */,
-/* 562 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-
-Object.defineProperty(exports, '__esModule', { value: true });
-
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
-
-var osName = _interopDefault(__webpack_require__(2));
-
-function getUserAgent() {
-  try {
-    return `Node.js/${process.version.substr(1)} (${osName()}; ${process.arch})`;
-  } catch (error) {
-    if (/wmic os get Caption/.test(error.message)) {
-      return "Windows <version undetectable>";
-    }
-
-    throw error;
-  }
-}
-
-exports.getUserAgent = getUserAgent;
-//# sourceMappingURL=index.js.map
-
-
-/***/ }),
+/* 562 */,
 /* 563 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -14752,31 +15030,66 @@ exports.default = Provider;
 /* 591 */,
 /* 592 */,
 /* 593 */
-/***/ (function(__unusedmodule, exports) {
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
-Object.defineProperty(exports, "__esModule", { value: true });
-function read(path, settings) {
-    const lstat = settings.fs.lstatSync(path);
-    if (!lstat.isSymbolicLink() || !settings.followSymbolicLink) {
-        return lstat;
+
+const fill = __webpack_require__(205);
+const utils = __webpack_require__(978);
+
+const compile = (ast, options = {}) => {
+  let walk = (node, parent = {}) => {
+    let invalidBlock = utils.isInvalidBrace(parent);
+    let invalidNode = node.invalid === true && options.escapeInvalid === true;
+    let invalid = invalidBlock === true || invalidNode === true;
+    let prefix = options.escapeInvalid === true ? '\\' : '';
+    let output = '';
+
+    if (node.isOpen === true) {
+      return prefix + node.value;
     }
-    try {
-        const stat = settings.fs.statSync(path);
-        if (settings.markSymbolicLink) {
-            stat.isSymbolicLink = () => true;
-        }
-        return stat;
+    if (node.isClose === true) {
+      return prefix + node.value;
     }
-    catch (error) {
-        if (!settings.throwErrorOnBrokenSymbolicLink) {
-            return lstat;
-        }
-        throw error;
+
+    if (node.type === 'open') {
+      return invalid ? (prefix + node.value) : '(';
     }
-}
-exports.read = read;
+
+    if (node.type === 'close') {
+      return invalid ? (prefix + node.value) : ')';
+    }
+
+    if (node.type === 'comma') {
+      return node.prev.type === 'comma' ? '' : (invalid ? node.value : '|');
+    }
+
+    if (node.value) {
+      return node.value;
+    }
+
+    if (node.nodes && node.ranges > 0) {
+      let args = utils.reduce(node.nodes);
+      let range = fill(...args, { ...options, wrap: false, toRegex: true });
+
+      if (range.length !== 0) {
+        return args.length > 1 && range.length > 1 ? `(${range})` : range;
+      }
+    }
+
+    if (node.nodes) {
+      for (let child of node.nodes) {
+        output += walk(child, node);
+      }
+    }
+    return output;
+  };
+
+  return walk(ast);
+};
+
+module.exports = compile;
 
 
 /***/ }),
@@ -14958,36 +15271,184 @@ exports.joinPathSegments = joinPathSegments;
 
 
 /***/ }),
-/* 618 */,
-/* 619 */
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
+/* 618 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
 
 "use strict";
 
 
-Object.defineProperty(exports, '__esModule', { value: true });
+const stringify = __webpack_require__(758);
+const compile = __webpack_require__(593);
+const expand = __webpack_require__(533);
+const parse = __webpack_require__(30);
 
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+/**
+ * Expand the given pattern or create a regex-compatible string.
+ *
+ * ```js
+ * const braces = require('braces');
+ * console.log(braces('{a,b,c}', { compile: true })); //=> ['(a|b|c)']
+ * console.log(braces('{a,b,c}')); //=> ['a', 'b', 'c']
+ * ```
+ * @param {String} `str`
+ * @param {Object} `options`
+ * @return {String}
+ * @api public
+ */
 
-var osName = _interopDefault(__webpack_require__(2));
+const braces = (input, options = {}) => {
+  let output = [];
 
-function getUserAgent() {
-  try {
-    return `Node.js/${process.version.substr(1)} (${osName()}; ${process.arch})`;
-  } catch (error) {
-    if (/wmic os get Caption/.test(error.message)) {
-      return "Windows <version undetectable>";
+  if (Array.isArray(input)) {
+    for (let pattern of input) {
+      let result = braces.create(pattern, options);
+      if (Array.isArray(result)) {
+        output.push(...result);
+      } else {
+        output.push(result);
+      }
     }
-
-    throw error;
+  } else {
+    output = [].concat(braces.create(input, options));
   }
-}
 
-exports.getUserAgent = getUserAgent;
-//# sourceMappingURL=index.js.map
+  if (options && options.expand === true && options.nodupes === true) {
+    output = [...new Set(output)];
+  }
+  return output;
+};
+
+/**
+ * Parse the given `str` with the given `options`.
+ *
+ * ```js
+ * // braces.parse(pattern, [, options]);
+ * const ast = braces.parse('a/{b,c}/d');
+ * console.log(ast);
+ * ```
+ * @param {String} pattern Brace pattern to parse
+ * @param {Object} options
+ * @return {Object} Returns an AST
+ * @api public
+ */
+
+braces.parse = (input, options = {}) => parse(input, options);
+
+/**
+ * Creates a braces string from an AST, or an AST node.
+ *
+ * ```js
+ * const braces = require('braces');
+ * let ast = braces.parse('foo/{a,b}/bar');
+ * console.log(stringify(ast.nodes[2])); //=> '{a,b}'
+ * ```
+ * @param {String} `input` Brace pattern or AST.
+ * @param {Object} `options`
+ * @return {Array} Returns an array of expanded values.
+ * @api public
+ */
+
+braces.stringify = (input, options = {}) => {
+  if (typeof input === 'string') {
+    return stringify(braces.parse(input, options), options);
+  }
+  return stringify(input, options);
+};
+
+/**
+ * Compiles a brace pattern into a regex-compatible, optimized string.
+ * This method is called by the main [braces](#braces) function by default.
+ *
+ * ```js
+ * const braces = require('braces');
+ * console.log(braces.compile('a/{b,c}/d'));
+ * //=> ['a/(b|c)/d']
+ * ```
+ * @param {String} `input` Brace pattern or AST.
+ * @param {Object} `options`
+ * @return {Array} Returns an array of expanded values.
+ * @api public
+ */
+
+braces.compile = (input, options = {}) => {
+  if (typeof input === 'string') {
+    input = braces.parse(input, options);
+  }
+  return compile(input, options);
+};
+
+/**
+ * Expands a brace pattern into an array. This method is called by the
+ * main [braces](#braces) function when `options.expand` is true. Before
+ * using this method it's recommended that you read the [performance notes](#performance))
+ * and advantages of using [.compile](#compile) instead.
+ *
+ * ```js
+ * const braces = require('braces');
+ * console.log(braces.expand('a/{b,c}/d'));
+ * //=> ['a/b/d', 'a/c/d'];
+ * ```
+ * @param {String} `pattern` Brace pattern
+ * @param {Object} `options`
+ * @return {Array} Returns an array of expanded values.
+ * @api public
+ */
+
+braces.expand = (input, options = {}) => {
+  if (typeof input === 'string') {
+    input = braces.parse(input, options);
+  }
+
+  let result = expand(input, options);
+
+  // filter out empty strings if specified
+  if (options.noempty === true) {
+    result = result.filter(Boolean);
+  }
+
+  // filter out duplicates if specified
+  if (options.nodupes === true) {
+    result = [...new Set(result)];
+  }
+
+  return result;
+};
+
+/**
+ * Processes a brace pattern and returns either an expanded array
+ * (if `options.expand` is true), a highly optimized regex-compatible string.
+ * This method is called by the main [braces](#braces) function.
+ *
+ * ```js
+ * const braces = require('braces');
+ * console.log(braces.create('user-{200..300}/project-{a,b,c}-{1..10}'))
+ * //=> 'user-(20[0-9]|2[1-9][0-9]|300)/project-(a|b|c)-([1-9]|10)'
+ * ```
+ * @param {String} `pattern` Brace pattern
+ * @param {Object} `options`
+ * @return {Array} Returns an array of expanded values.
+ * @api public
+ */
+
+braces.create = (input, options = {}) => {
+  if (input === '' || input.length < 3) {
+    return [input];
+  }
+
+ return options.expand !== true
+    ? braces.compile(input, options)
+    : braces.expand(input, options);
+};
+
+/**
+ * Expose "braces"
+ */
+
+module.exports = braces;
 
 
 /***/ }),
+/* 619 */,
 /* 620 */,
 /* 621 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
@@ -15228,7 +15689,61 @@ module.exports.gitignore = gitignore;
 
 
 /***/ }),
-/* 626 */,
+/* 626 */
+/***/ (function(module) {
+
+"use strict";
+
+
+/*!
+ * isobject <https://github.com/jonschlinkert/isobject>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObject(val) {
+  return val != null && typeof val === 'object' && Array.isArray(val) === false;
+}
+
+/*!
+ * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObjectObject(o) {
+  return isObject(o) === true
+    && Object.prototype.toString.call(o) === '[object Object]';
+}
+
+function isPlainObject(o) {
+  var ctor,prot;
+
+  if (isObjectObject(o) === false) return false;
+
+  // If has modified constructor
+  ctor = o.constructor;
+  if (typeof ctor !== 'function') return false;
+
+  // If has modified prototype
+  prot = ctor.prototype;
+  if (isObjectObject(prot) === false) return false;
+
+  // If constructor does not have an Object-specific method
+  if (prot.hasOwnProperty('isPrototypeOf') === false) {
+    return false;
+  }
+
+  // Most likely a plain Object
+  return true;
+}
+
+module.exports = isPlainObject;
+
+
+/***/ }),
 /* 627 */,
 /* 628 */,
 /* 629 */,
@@ -15302,9 +15817,54 @@ function slice (args) {
 /* 638 */,
 /* 639 */,
 /* 640 */,
-/* 641 */,
+/* 641 */
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+function read(path, settings) {
+    const lstat = settings.fs.lstatSync(path);
+    if (!lstat.isSymbolicLink() || !settings.followSymbolicLink) {
+        return lstat;
+    }
+    try {
+        const stat = settings.fs.statSync(path);
+        if (settings.markSymbolicLink) {
+            stat.isSymbolicLink = () => true;
+        }
+        return stat;
+    }
+    catch (error) {
+        if (!settings.throwErrorOnBrokenSymbolicLink) {
+            return lstat;
+        }
+        throw error;
+    }
+}
+exports.read = read;
+
+
+/***/ }),
 /* 642 */,
-/* 643 */,
+/* 643 */
+/***/ (function(module) {
+
+"use strict";
+
+module.exports = path => {
+	const isExtendedLengthPath = /^\\\\\?\\/.test(path);
+	const hasNonAscii = /[^\u0000-\u0080]+/.test(path); // eslint-disable-line no-control-regex
+
+	if (isExtendedLengthPath || hasNonAscii) {
+		return path;
+	}
+
+	return path.replace(/\\/g, '/');
+};
+
+
+/***/ }),
 /* 644 */,
 /* 645 */,
 /* 646 */,
@@ -15323,7 +15883,27 @@ function getLastPage (octokit, link, headers) {
 
 
 /***/ }),
-/* 650 */,
+/* 650 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+module.exports = getUserAgentNode
+
+const osName = __webpack_require__(2)
+
+function getUserAgentNode () {
+  try {
+    return `Node.js/${process.version.substr(1)} (${osName()}; ${process.arch})`
+  } catch (error) {
+    if (/wmic os get Caption/.test(error.message)) {
+      return 'Windows <version undetectable>'
+    }
+
+    throw error
+  }
+}
+
+
+/***/ }),
 /* 651 */,
 /* 652 */,
 /* 653 */,
@@ -15582,61 +16162,7 @@ exports.Deprecation = Deprecation;
 /* 693 */,
 /* 694 */,
 /* 695 */,
-/* 696 */
-/***/ (function(module) {
-
-"use strict";
-
-
-/*!
- * isobject <https://github.com/jonschlinkert/isobject>
- *
- * Copyright (c) 2014-2017, Jon Schlinkert.
- * Released under the MIT License.
- */
-
-function isObject(val) {
-  return val != null && typeof val === 'object' && Array.isArray(val) === false;
-}
-
-/*!
- * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
- *
- * Copyright (c) 2014-2017, Jon Schlinkert.
- * Released under the MIT License.
- */
-
-function isObjectObject(o) {
-  return isObject(o) === true
-    && Object.prototype.toString.call(o) === '[object Object]';
-}
-
-function isPlainObject(o) {
-  var ctor,prot;
-
-  if (isObjectObject(o) === false) return false;
-
-  // If has modified constructor
-  ctor = o.constructor;
-  if (typeof ctor !== 'function') return false;
-
-  // If has modified prototype
-  prot = ctor.prototype;
-  if (isObjectObject(prot) === false) return false;
-
-  // If constructor does not have an Object-specific method
-  if (prot.hasOwnProperty('isPrototypeOf') === false) {
-    return false;
-  }
-
-  // Most likely a plain Object
-  return true;
-}
-
-module.exports = isPlainObject;
-
-
-/***/ }),
+/* 696 */,
 /* 697 */
 /***/ (function(module) {
 
@@ -15759,7 +16285,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const path = __webpack_require__(622);
 const globParent = __webpack_require__(230);
 const isGlob = __webpack_require__(486);
-const micromatch = __webpack_require__(74);
+const micromatch = __webpack_require__(35);
 const GLOBSTAR = '**';
 function isStaticPattern(pattern) {
     return !isDynamicPattern(pattern);
@@ -15890,262 +16416,7 @@ function callSuccessCallback(callback, result) {
 
 /***/ }),
 /* 729 */,
-/* 730 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-/*!
- * fill-range <https://github.com/jonschlinkert/fill-range>
- *
- * Copyright (c) 2014-present, Jon Schlinkert.
- * Licensed under the MIT License.
- */
-
-
-
-const util = __webpack_require__(669);
-const toRegexRange = __webpack_require__(789);
-
-const isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
-
-const transform = toNumber => {
-  return value => toNumber === true ? Number(value) : String(value);
-};
-
-const isValidValue = value => {
-  return typeof value === 'number' || (typeof value === 'string' && value !== '');
-};
-
-const isNumber = num => Number.isInteger(+num);
-
-const zeros = input => {
-  let value = `${input}`;
-  let index = -1;
-  if (value[0] === '-') value = value.slice(1);
-  if (value === '0') return false;
-  while (value[++index] === '0');
-  return index > 0;
-};
-
-const stringify = (start, end, options) => {
-  if (typeof start === 'string' || typeof end === 'string') {
-    return true;
-  }
-  return options.stringify === true;
-};
-
-const pad = (input, maxLength, toNumber) => {
-  if (maxLength > 0) {
-    let dash = input[0] === '-' ? '-' : '';
-    if (dash) input = input.slice(1);
-    input = (dash + input.padStart(dash ? maxLength - 1 : maxLength, '0'));
-  }
-  if (toNumber === false) {
-    return String(input);
-  }
-  return input;
-};
-
-const toMaxLen = (input, maxLength) => {
-  let negative = input[0] === '-' ? '-' : '';
-  if (negative) {
-    input = input.slice(1);
-    maxLength--;
-  }
-  while (input.length < maxLength) input = '0' + input;
-  return negative ? ('-' + input) : input;
-};
-
-const toSequence = (parts, options) => {
-  parts.negatives.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-  parts.positives.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-
-  let prefix = options.capture ? '' : '?:';
-  let positives = '';
-  let negatives = '';
-  let result;
-
-  if (parts.positives.length) {
-    positives = parts.positives.join('|');
-  }
-
-  if (parts.negatives.length) {
-    negatives = `-(${prefix}${parts.negatives.join('|')})`;
-  }
-
-  if (positives && negatives) {
-    result = `${positives}|${negatives}`;
-  } else {
-    result = positives || negatives;
-  }
-
-  if (options.wrap) {
-    return `(${prefix}${result})`;
-  }
-
-  return result;
-};
-
-const toRange = (a, b, isNumbers, options) => {
-  if (isNumbers) {
-    return toRegexRange(a, b, { wrap: false, ...options });
-  }
-
-  let start = String.fromCharCode(a);
-  if (a === b) return start;
-
-  let stop = String.fromCharCode(b);
-  return `[${start}-${stop}]`;
-};
-
-const toRegex = (start, end, options) => {
-  if (Array.isArray(start)) {
-    let wrap = options.wrap === true;
-    let prefix = options.capture ? '' : '?:';
-    return wrap ? `(${prefix}${start.join('|')})` : start.join('|');
-  }
-  return toRegexRange(start, end, options);
-};
-
-const rangeError = (...args) => {
-  return new RangeError('Invalid range arguments: ' + util.inspect(...args));
-};
-
-const invalidRange = (start, end, options) => {
-  if (options.strictRanges === true) throw rangeError([start, end]);
-  return [];
-};
-
-const invalidStep = (step, options) => {
-  if (options.strictRanges === true) {
-    throw new TypeError(`Expected step "${step}" to be a number`);
-  }
-  return [];
-};
-
-const fillNumbers = (start, end, step = 1, options = {}) => {
-  let a = Number(start);
-  let b = Number(end);
-
-  if (!Number.isInteger(a) || !Number.isInteger(b)) {
-    if (options.strictRanges === true) throw rangeError([start, end]);
-    return [];
-  }
-
-  // fix negative zero
-  if (a === 0) a = 0;
-  if (b === 0) b = 0;
-
-  let descending = a > b;
-  let startString = String(start);
-  let endString = String(end);
-  let stepString = String(step);
-  step = Math.max(Math.abs(step), 1);
-
-  let padded = zeros(startString) || zeros(endString) || zeros(stepString);
-  let maxLen = padded ? Math.max(startString.length, endString.length, stepString.length) : 0;
-  let toNumber = padded === false && stringify(start, end, options) === false;
-  let format = options.transform || transform(toNumber);
-
-  if (options.toRegex && step === 1) {
-    return toRange(toMaxLen(start, maxLen), toMaxLen(end, maxLen), true, options);
-  }
-
-  let parts = { negatives: [], positives: [] };
-  let push = num => parts[num < 0 ? 'negatives' : 'positives'].push(Math.abs(num));
-  let range = [];
-  let index = 0;
-
-  while (descending ? a >= b : a <= b) {
-    if (options.toRegex === true && step > 1) {
-      push(a);
-    } else {
-      range.push(pad(format(a, index), maxLen, toNumber));
-    }
-    a = descending ? a - step : a + step;
-    index++;
-  }
-
-  if (options.toRegex === true) {
-    return step > 1
-      ? toSequence(parts, options)
-      : toRegex(range, null, { wrap: false, ...options });
-  }
-
-  return range;
-};
-
-const fillLetters = (start, end, step = 1, options = {}) => {
-  if ((!isNumber(start) && start.length > 1) || (!isNumber(end) && end.length > 1)) {
-    return invalidRange(start, end, options);
-  }
-
-
-  let format = options.transform || (val => String.fromCharCode(val));
-  let a = `${start}`.charCodeAt(0);
-  let b = `${end}`.charCodeAt(0);
-
-  let descending = a > b;
-  let min = Math.min(a, b);
-  let max = Math.max(a, b);
-
-  if (options.toRegex && step === 1) {
-    return toRange(min, max, false, options);
-  }
-
-  let range = [];
-  let index = 0;
-
-  while (descending ? a >= b : a <= b) {
-    range.push(format(a, index));
-    a = descending ? a - step : a + step;
-    index++;
-  }
-
-  if (options.toRegex === true) {
-    return toRegex(range, null, { wrap: false, options });
-  }
-
-  return range;
-};
-
-const fill = (start, end, step, options = {}) => {
-  if (end == null && isValidValue(start)) {
-    return [start];
-  }
-
-  if (!isValidValue(start) || !isValidValue(end)) {
-    return invalidRange(start, end, options);
-  }
-
-  if (typeof step === 'function') {
-    return fill(start, end, 1, { transform: step });
-  }
-
-  if (isObject(step)) {
-    return fill(start, end, 0, step);
-  }
-
-  let opts = { ...options };
-  if (opts.capture === true) opts.wrap = true;
-  step = step || opts.step || 1;
-
-  if (!isNumber(step)) {
-    if (step != null && !isObject(step)) return invalidStep(step, opts);
-    return fill(start, end, 1, step);
-  }
-
-  if (isNumber(start) && isNumber(end)) {
-    return fillNumbers(start, end, step, opts);
-  }
-
-  return fillLetters(start, end, Math.max(Math.abs(step), 1), opts);
-};
-
-module.exports = fill;
-
-
-/***/ }),
+/* 730 */,
 /* 731 */,
 /* 732 */,
 /* 733 */,
@@ -16246,8 +16517,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
 var endpoint = __webpack_require__(385);
-var universalUserAgent = __webpack_require__(211);
-var isPlainObject = _interopDefault(__webpack_require__(696));
+var universalUserAgent = __webpack_require__(796);
+var isPlainObject = _interopDefault(__webpack_require__(548));
 var nodeFetch = _interopDefault(__webpack_require__(454));
 var requestError = __webpack_require__(463);
 
@@ -16390,7 +16661,45 @@ exports.request = request;
 /* 755 */,
 /* 756 */,
 /* 757 */,
-/* 758 */,
+/* 758 */
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+const utils = __webpack_require__(978);
+
+module.exports = (ast, options = {}) => {
+  let stringify = (node, parent = {}) => {
+    let invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+    let invalidNode = node.invalid === true && options.escapeInvalid === true;
+    let output = '';
+
+    if (node.value) {
+      if ((invalidBlock || invalidNode) && utils.isOpenOrClose(node)) {
+        return '\\' + node.value;
+      }
+      return node.value;
+    }
+
+    if (node.value) {
+      return node.value;
+    }
+
+    if (node.nodes) {
+      for (let child of node.nodes) {
+        output += stringify(child);
+      }
+    }
+    return output;
+  };
+
+  return stringify(ast);
+};
+
+
+
+/***/ }),
 /* 759 */,
 /* 760 */,
 /* 761 */
@@ -16510,490 +16819,48 @@ function getFirstPage (octokit, link, headers) {
 /* 780 */,
 /* 781 */,
 /* 782 */,
-/* 783 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-
-
-const stringify = __webpack_require__(382);
-const compile = __webpack_require__(435);
-const expand = __webpack_require__(441);
-const parse = __webpack_require__(227);
-
-/**
- * Expand the given pattern or create a regex-compatible string.
- *
- * ```js
- * const braces = require('braces');
- * console.log(braces('{a,b,c}', { compile: true })); //=> ['(a|b|c)']
- * console.log(braces('{a,b,c}')); //=> ['a', 'b', 'c']
- * ```
- * @param {String} `str`
- * @param {Object} `options`
- * @return {String}
- * @api public
- */
-
-const braces = (input, options = {}) => {
-  let output = [];
-
-  if (Array.isArray(input)) {
-    for (let pattern of input) {
-      let result = braces.create(pattern, options);
-      if (Array.isArray(result)) {
-        output.push(...result);
-      } else {
-        output.push(result);
-      }
-    }
-  } else {
-    output = [].concat(braces.create(input, options));
-  }
-
-  if (options && options.expand === true && options.nodupes === true) {
-    output = [...new Set(output)];
-  }
-  return output;
-};
-
-/**
- * Parse the given `str` with the given `options`.
- *
- * ```js
- * // braces.parse(pattern, [, options]);
- * const ast = braces.parse('a/{b,c}/d');
- * console.log(ast);
- * ```
- * @param {String} pattern Brace pattern to parse
- * @param {Object} options
- * @return {Object} Returns an AST
- * @api public
- */
-
-braces.parse = (input, options = {}) => parse(input, options);
-
-/**
- * Creates a braces string from an AST, or an AST node.
- *
- * ```js
- * const braces = require('braces');
- * let ast = braces.parse('foo/{a,b}/bar');
- * console.log(stringify(ast.nodes[2])); //=> '{a,b}'
- * ```
- * @param {String} `input` Brace pattern or AST.
- * @param {Object} `options`
- * @return {Array} Returns an array of expanded values.
- * @api public
- */
-
-braces.stringify = (input, options = {}) => {
-  if (typeof input === 'string') {
-    return stringify(braces.parse(input, options), options);
-  }
-  return stringify(input, options);
-};
-
-/**
- * Compiles a brace pattern into a regex-compatible, optimized string.
- * This method is called by the main [braces](#braces) function by default.
- *
- * ```js
- * const braces = require('braces');
- * console.log(braces.compile('a/{b,c}/d'));
- * //=> ['a/(b|c)/d']
- * ```
- * @param {String} `input` Brace pattern or AST.
- * @param {Object} `options`
- * @return {Array} Returns an array of expanded values.
- * @api public
- */
-
-braces.compile = (input, options = {}) => {
-  if (typeof input === 'string') {
-    input = braces.parse(input, options);
-  }
-  return compile(input, options);
-};
-
-/**
- * Expands a brace pattern into an array. This method is called by the
- * main [braces](#braces) function when `options.expand` is true. Before
- * using this method it's recommended that you read the [performance notes](#performance))
- * and advantages of using [.compile](#compile) instead.
- *
- * ```js
- * const braces = require('braces');
- * console.log(braces.expand('a/{b,c}/d'));
- * //=> ['a/b/d', 'a/c/d'];
- * ```
- * @param {String} `pattern` Brace pattern
- * @param {Object} `options`
- * @return {Array} Returns an array of expanded values.
- * @api public
- */
-
-braces.expand = (input, options = {}) => {
-  if (typeof input === 'string') {
-    input = braces.parse(input, options);
-  }
-
-  let result = expand(input, options);
-
-  // filter out empty strings if specified
-  if (options.noempty === true) {
-    result = result.filter(Boolean);
-  }
-
-  // filter out duplicates if specified
-  if (options.nodupes === true) {
-    result = [...new Set(result)];
-  }
-
-  return result;
-};
-
-/**
- * Processes a brace pattern and returns either an expanded array
- * (if `options.expand` is true), a highly optimized regex-compatible string.
- * This method is called by the main [braces](#braces) function.
- *
- * ```js
- * const braces = require('braces');
- * console.log(braces.create('user-{200..300}/project-{a,b,c}-{1..10}'))
- * //=> 'user-(20[0-9]|2[1-9][0-9]|300)/project-(a|b|c)-([1-9]|10)'
- * ```
- * @param {String} `pattern` Brace pattern
- * @param {Object} `options`
- * @return {Array} Returns an array of expanded values.
- * @api public
- */
-
-braces.create = (input, options = {}) => {
-  if (input === '' || input.length < 3) {
-    return [input];
-  }
-
- return options.expand !== true
-    ? braces.compile(input, options)
-    : braces.expand(input, options);
-};
-
-/**
- * Expose "braces"
- */
-
-module.exports = braces;
-
-
-/***/ }),
+/* 783 */,
 /* 784 */,
 /* 785 */,
 /* 786 */,
 /* 787 */,
 /* 788 */,
-/* 789 */
-/***/ (function(module, __unusedexports, __webpack_require__) {
-
-"use strict";
-/*!
- * to-regex-range <https://github.com/micromatch/to-regex-range>
- *
- * Copyright (c) 2015-present, Jon Schlinkert.
- * Released under the MIT License.
- */
-
-
-
-const isNumber = __webpack_require__(914);
-
-const toRegexRange = (min, max, options) => {
-  if (isNumber(min) === false) {
-    throw new TypeError('toRegexRange: expected the first argument to be a number');
-  }
-
-  if (max === void 0 || min === max) {
-    return String(min);
-  }
-
-  if (isNumber(max) === false) {
-    throw new TypeError('toRegexRange: expected the second argument to be a number.');
-  }
-
-  let opts = { relaxZeros: true, ...options };
-  if (typeof opts.strictZeros === 'boolean') {
-    opts.relaxZeros = opts.strictZeros === false;
-  }
-
-  let relax = String(opts.relaxZeros);
-  let shorthand = String(opts.shorthand);
-  let capture = String(opts.capture);
-  let wrap = String(opts.wrap);
-  let cacheKey = min + ':' + max + '=' + relax + shorthand + capture + wrap;
-
-  if (toRegexRange.cache.hasOwnProperty(cacheKey)) {
-    return toRegexRange.cache[cacheKey].result;
-  }
-
-  let a = Math.min(min, max);
-  let b = Math.max(min, max);
-
-  if (Math.abs(a - b) === 1) {
-    let result = min + '|' + max;
-    if (opts.capture) {
-      return `(${result})`;
-    }
-    if (opts.wrap === false) {
-      return result;
-    }
-    return `(?:${result})`;
-  }
-
-  let isPadded = hasPadding(min) || hasPadding(max);
-  let state = { min, max, a, b };
-  let positives = [];
-  let negatives = [];
-
-  if (isPadded) {
-    state.isPadded = isPadded;
-    state.maxLen = String(state.max).length;
-  }
-
-  if (a < 0) {
-    let newMin = b < 0 ? Math.abs(b) : 1;
-    negatives = splitToPatterns(newMin, Math.abs(a), state, opts);
-    a = state.a = 0;
-  }
-
-  if (b >= 0) {
-    positives = splitToPatterns(a, b, state, opts);
-  }
-
-  state.negatives = negatives;
-  state.positives = positives;
-  state.result = collatePatterns(negatives, positives, opts);
-
-  if (opts.capture === true) {
-    state.result = `(${state.result})`;
-  } else if (opts.wrap !== false && (positives.length + negatives.length) > 1) {
-    state.result = `(?:${state.result})`;
-  }
-
-  toRegexRange.cache[cacheKey] = state;
-  return state.result;
-};
-
-function collatePatterns(neg, pos, options) {
-  let onlyNegative = filterPatterns(neg, pos, '-', false, options) || [];
-  let onlyPositive = filterPatterns(pos, neg, '', false, options) || [];
-  let intersected = filterPatterns(neg, pos, '-?', true, options) || [];
-  let subpatterns = onlyNegative.concat(intersected).concat(onlyPositive);
-  return subpatterns.join('|');
-}
-
-function splitToRanges(min, max) {
-  let nines = 1;
-  let zeros = 1;
-
-  let stop = countNines(min, nines);
-  let stops = new Set([max]);
-
-  while (min <= stop && stop <= max) {
-    stops.add(stop);
-    nines += 1;
-    stop = countNines(min, nines);
-  }
-
-  stop = countZeros(max + 1, zeros) - 1;
-
-  while (min < stop && stop <= max) {
-    stops.add(stop);
-    zeros += 1;
-    stop = countZeros(max + 1, zeros) - 1;
-  }
-
-  stops = [...stops];
-  stops.sort(compare);
-  return stops;
-}
-
-/**
- * Convert a range to a regex pattern
- * @param {Number} `start`
- * @param {Number} `stop`
- * @return {String}
- */
-
-function rangeToPattern(start, stop, options) {
-  if (start === stop) {
-    return { pattern: start, count: [], digits: 0 };
-  }
-
-  let zipped = zip(start, stop);
-  let digits = zipped.length;
-  let pattern = '';
-  let count = 0;
-
-  for (let i = 0; i < digits; i++) {
-    let [startDigit, stopDigit] = zipped[i];
-
-    if (startDigit === stopDigit) {
-      pattern += startDigit;
-
-    } else if (startDigit !== '0' || stopDigit !== '9') {
-      pattern += toCharacterClass(startDigit, stopDigit, options);
-
-    } else {
-      count++;
-    }
-  }
-
-  if (count) {
-    pattern += options.shorthand === true ? '\\d' : '[0-9]';
-  }
-
-  return { pattern, count: [count], digits };
-}
-
-function splitToPatterns(min, max, tok, options) {
-  let ranges = splitToRanges(min, max);
-  let tokens = [];
-  let start = min;
-  let prev;
-
-  for (let i = 0; i < ranges.length; i++) {
-    let max = ranges[i];
-    let obj = rangeToPattern(String(start), String(max), options);
-    let zeros = '';
-
-    if (!tok.isPadded && prev && prev.pattern === obj.pattern) {
-      if (prev.count.length > 1) {
-        prev.count.pop();
-      }
-
-      prev.count.push(obj.count[0]);
-      prev.string = prev.pattern + toQuantifier(prev.count);
-      start = max + 1;
-      continue;
-    }
-
-    if (tok.isPadded) {
-      zeros = padZeros(max, tok, options);
-    }
-
-    obj.string = zeros + obj.pattern + toQuantifier(obj.count);
-    tokens.push(obj);
-    start = max + 1;
-    prev = obj;
-  }
-
-  return tokens;
-}
-
-function filterPatterns(arr, comparison, prefix, intersection, options) {
-  let result = [];
-
-  for (let ele of arr) {
-    let { string } = ele;
-
-    // only push if _both_ are negative...
-    if (!intersection && !contains(comparison, 'string', string)) {
-      result.push(prefix + string);
-    }
-
-    // or _both_ are positive
-    if (intersection && contains(comparison, 'string', string)) {
-      result.push(prefix + string);
-    }
-  }
-  return result;
-}
-
-/**
- * Zip strings
- */
-
-function zip(a, b) {
-  let arr = [];
-  for (let i = 0; i < a.length; i++) arr.push([a[i], b[i]]);
-  return arr;
-}
-
-function compare(a, b) {
-  return a > b ? 1 : b > a ? -1 : 0;
-}
-
-function contains(arr, key, val) {
-  return arr.some(ele => ele[key] === val);
-}
-
-function countNines(min, len) {
-  return Number(String(min).slice(0, -len) + '9'.repeat(len));
-}
-
-function countZeros(integer, zeros) {
-  return integer - (integer % Math.pow(10, zeros));
-}
-
-function toQuantifier(digits) {
-  let [start = 0, stop = ''] = digits;
-  if (stop || start > 1) {
-    return `{${start + (stop ? ',' + stop : '')}}`;
-  }
-  return '';
-}
-
-function toCharacterClass(a, b, options) {
-  return `[${a}${(b - a === 1) ? '' : '-'}${b}]`;
-}
-
-function hasPadding(str) {
-  return /^-?(0+)\d/.test(str);
-}
-
-function padZeros(value, tok, options) {
-  if (!tok.isPadded) {
-    return value;
-  }
-
-  let diff = Math.abs(tok.maxLen - String(value).length);
-  let relax = options.relaxZeros !== false;
-
-  switch (diff) {
-    case 0:
-      return '';
-    case 1:
-      return relax ? '0?' : '0';
-    case 2:
-      return relax ? '0{0,2}' : '00';
-    default: {
-      return relax ? `0{0,${diff}}` : `0{${diff}}`;
-    }
-  }
-}
-
-/**
- * Cache
- */
-
-toRegexRange.cache = {};
-toRegexRange.clearCache = () => (toRegexRange.cache = {});
-
-/**
- * Expose `toRegexRange`
- */
-
-module.exports = toRegexRange;
-
-
-/***/ }),
+/* 789 */,
 /* 790 */,
 /* 791 */,
 /* 792 */,
 /* 793 */,
 /* 794 */,
 /* 795 */,
-/* 796 */,
+/* 796 */
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+var osName = _interopDefault(__webpack_require__(2));
+
+function getUserAgent() {
+  try {
+    return `Node.js/${process.version.substr(1)} (${osName()}; ${process.arch})`;
+  } catch (error) {
+    if (/wmic os get Caption/.test(error.message)) {
+      return "Windows <version undetectable>";
+    }
+
+    throw error;
+  }
+}
+
+exports.getUserAgent = getUserAgent;
+//# sourceMappingURL=index.js.map
+
+
+/***/ }),
 /* 797 */,
 /* 798 */
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
@@ -17047,7 +16914,7 @@ const fs = __webpack_require__(747);
 const path = __webpack_require__(622);
 const fastGlob = __webpack_require__(406);
 const gitIgnore = __webpack_require__(396);
-const slash = __webpack_require__(184);
+const slash = __webpack_require__(643);
 
 const DEFAULT_IGNORE = [
 	'**/node_modules/**',
@@ -19895,7 +19762,7 @@ function childrenIgnored (self, path) {
 
 Object.defineProperty(exports, "__esModule", { value: true });
 const async = __webpack_require__(728);
-const sync = __webpack_require__(593);
+const sync = __webpack_require__(641);
 const settings_1 = __webpack_require__(872);
 exports.Settings = settings_1.default;
 function stat(path, optionsOrSettingsOrCallback, callback) {
@@ -21526,31 +21393,7 @@ function patchForDeprecation (octokit, apiOptions, method, methodName) {
 /* 911 */,
 /* 912 */,
 /* 913 */,
-/* 914 */
-/***/ (function(module) {
-
-"use strict";
-/*!
- * is-number <https://github.com/jonschlinkert/is-number>
- *
- * Copyright (c) 2014-present, Jon Schlinkert.
- * Released under the MIT License.
- */
-
-
-
-module.exports = function(num) {
-  if (typeof num === 'number') {
-    return num - num === 0;
-  }
-  if (typeof num === 'string' && num.trim() !== '') {
-    return Number.isFinite ? Number.isFinite(+num) : isFinite(+num);
-  }
-  return false;
-};
-
-
-/***/ }),
+/* 914 */,
 /* 915 */,
 /* 916 */,
 /* 917 */,
@@ -22208,7 +22051,125 @@ function onceStrict (fn) {
 /* 975 */,
 /* 976 */,
 /* 977 */,
-/* 978 */,
+/* 978 */
+/***/ (function(__unusedmodule, exports) {
+
+"use strict";
+
+
+exports.isInteger = num => {
+  if (typeof num === 'number') {
+    return Number.isInteger(num);
+  }
+  if (typeof num === 'string' && num.trim() !== '') {
+    return Number.isInteger(Number(num));
+  }
+  return false;
+};
+
+/**
+ * Find a node of the given type
+ */
+
+exports.find = (node, type) => node.nodes.find(node => node.type === type);
+
+/**
+ * Find a node of the given type
+ */
+
+exports.exceedsLimit = (min, max, step = 1, limit) => {
+  if (limit === false) return false;
+  if (!exports.isInteger(min) || !exports.isInteger(max)) return false;
+  return ((Number(max) - Number(min)) / Number(step)) >= limit;
+};
+
+/**
+ * Escape the given node with '\\' before node.value
+ */
+
+exports.escapeNode = (block, n = 0, type) => {
+  let node = block.nodes[n];
+  if (!node) return;
+
+  if ((type && node.type === type) || node.type === 'open' || node.type === 'close') {
+    if (node.escaped !== true) {
+      node.value = '\\' + node.value;
+      node.escaped = true;
+    }
+  }
+};
+
+/**
+ * Returns true if the given brace node should be enclosed in literal braces
+ */
+
+exports.encloseBrace = node => {
+  if (node.type !== 'brace') return false;
+  if ((node.commas >> 0 + node.ranges >> 0) === 0) {
+    node.invalid = true;
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Returns true if a brace node is invalid.
+ */
+
+exports.isInvalidBrace = block => {
+  if (block.type !== 'brace') return false;
+  if (block.invalid === true || block.dollar) return true;
+  if ((block.commas >> 0 + block.ranges >> 0) === 0) {
+    block.invalid = true;
+    return true;
+  }
+  if (block.open !== true || block.close !== true) {
+    block.invalid = true;
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Returns true if a node is an open or close node
+ */
+
+exports.isOpenOrClose = node => {
+  if (node.type === 'open' || node.type === 'close') {
+    return true;
+  }
+  return node.open === true || node.close === true;
+};
+
+/**
+ * Reduce an array of text nodes.
+ */
+
+exports.reduce = nodes => nodes.reduce((acc, node) => {
+  if (node.type === 'text') acc.push(node.value);
+  if (node.type === 'range') node.type = 'text';
+  return acc;
+}, []);
+
+/**
+ * Flatten an array
+ */
+
+exports.flatten = (...args) => {
+  const result = [];
+  const flat = arr => {
+    for (let i = 0; i < arr.length; i++) {
+      let ele = arr[i];
+      Array.isArray(ele) ? flat(ele, result) : ele !== void 0 && result.push(ele);
+    }
+    return result;
+  };
+  flat(args);
+  return result;
+};
+
+
+/***/ }),
 /* 979 */,
 /* 980 */,
 /* 981 */,
