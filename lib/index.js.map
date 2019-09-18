@@ -9121,7 +9121,7 @@ function run() {
             action_core.setOutput("time", time);
         }
         catch (error) {
-            action_core.setFailed(error.message);
+            action_core.setFailed(error.message + "\r\n" + error.stack);
         }
     });
 }
