@@ -91,16 +91,40 @@ with:
   draft: true
 ```
 
-## Developer
+## For Developer
 
-You can use a tool called [zeit/ncc][2] to compile your code and modules into one file used for distribution.
+We can use [npm][3] or [yarn][4] to build this action.
 
-1. Install ```zeit/ncc``` by running this command in your terminal. ```npm i @zeit/ncc -g```
-2. Compile your ```index.js``` file. ```ncc build src/index.js``` .You'll see a new ```dist/index.js``` file with your code and the compiled modules.
-3. Change the ```main``` keyword in your ```action.yml``` file to use the new ```dist/index.js``` file. ```main: 'dist/index.js'```
-4. From your terminal, commit the updates to your ```action.yml```, ```dist/index.js```, and node_modules files. ```<pre><code class="hljs language-shell">git add action.yml dist/index.js git commit -m "Use zeit/ncc" git push</code></pre>```
+```bash
+# for npm
+npm install
+npm run build
 
-Testing: https://help.github.com/en/articles/creating-a-javascript-action#testing-out-your-action-in-a-workflow
+# for yarn
+npm i -g yarn
+yarn install
+yarn run build
+
+# commit
+git add lib/* src/*
+git commit -m "COMMIT MESSAGE"
+```
+
+### Reference
+
+| title                                             |                                                      link                                                         |
+|:--------------------------------------------------|:------------------------------------------------------------------------------------------------------------------|
+| GitHub Actions                                    | https://github.com/features/actions                                                                               |
+| Creating a javascript action                      | https://help.github.com/en/articles/creating-a-javascript-action#testing-out-your-action-in-a-workflow            |
+| Events that trigger workflows - GitHub Help       | https://help.github.com/en/articles/events-that-trigger-workflows                                                 |
+| The GitHub ToolKit for developing GitHub Actions  | https://github.com/actions/toolkit                                                                                |
+| GitHub GraphQL API v4                             | https://developer.github.com/v4/                                                                                  |
+| GitHub Rest API v3 for Release                    | https://developer.github.com/v3/repos/releases/                                                                   |
+| GitHub GraphQL API client for browsers and Node   | https://github.com/octokit/graphql.js                                                                             |
+| GitHub REST API client for JavaScript             | https://octokit.github.io/rest.js/                                                                                |
+
 
 [1]: https://help.github.com/en/articles/virtual-environments-for-github-actions#github_token-secret
 [2]: https://github.com/zeit/ncc
+[3]: https://www.npmjs.com/
+[4]: https://yarnpkg.com/lang/en/
