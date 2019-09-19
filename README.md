@@ -1,9 +1,11 @@
 # Upload To Github Release
 
-Github Action to deploy files to github release
+Github Action for deploy files to github release.
+
+Marketplace: https://github.com/marketplace/actions/uploadtogithubrelease
 
 [![GitHub Actions status](https://github.com/xresloader/upload-to-github-release/workflows/NPM%20Publish/badge.svg)](https://github.com/xresloader/upload-to-github-release/actions)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/xresloader/upload-to-github-release)](https://github.com/xresloader/upload-to-github-release/releases)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/xresloader/upload-to-github-release)](https://github.com/marketplace/actions/uploadtogithubrelease)
 [![GitHub](https://img.shields.io/github/license/xresloader/upload-to-github-release)](LICENSE)
 
 ![Dependency: @actions/core](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/@actions/core)
