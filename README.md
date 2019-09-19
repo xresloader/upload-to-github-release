@@ -29,7 +29,7 @@ Github Action to deploy files to github release
 ## Example usage
 
 ```yml
-uses: xresloader/upload-to-github-release@master
+uses: xresloader/upload-to-github-release@v1
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 with:
@@ -56,7 +56,7 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 ### `overwrite`
 
-**Optional** If you need to overwrite existing files, add overwrite: true to the `"with"`.
+**Optional** If you need to overwrite existing files, add overwrite: true.
 
 **Default** : false
 
@@ -77,8 +77,6 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 **Optional** With tags: true, your Releases deployment will trigger if and only if the build is a tagged build.
 
 **Default** : false
-
-If tags is set true, you should use the action event ```on: create``` . See https://help.github.com/en/articles/workflow-syntax-for-github-actions#on for more details.
 
 ### `branches`
 

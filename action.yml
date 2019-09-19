@@ -26,6 +26,10 @@ inputs:
     description: 'Only work on these branches(splited by semicolon), set to nothing to accept all branches.'
     required: false
     default: ''
+  verbose:
+    description: 'With verbose: true, be verbose.'
+    required: false
+    default: false
   
 outputs:
   release_name:

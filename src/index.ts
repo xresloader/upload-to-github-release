@@ -31,6 +31,7 @@ async function run() {
         const is_prerelease = getInputAsBool('prerelease');
         const with_tags = getInputAsBool('tags');
         const with_branches = getInputAsArray('branches');
+        const is_verbose = getInputAsBool('verbose');
 
         if (typeof (github_token) != 'string') {
             action_core.setFailed("token is invalid");
@@ -52,6 +53,7 @@ async function run() {
         // action_github.context.repo.owner = xresloader
 
         var release_name = "Release-" + action_github.context.sha.substr(0, 8);
+        var release_name_bind_to_tag = false;
         if (with_branches || with_tags) {
             // check branches or tags
             var match_filter = false;
@@ -59,6 +61,7 @@ async function run() {
                 const match_tag = action_github.context.ref.match(/refs\/tags\/(.*)/);
                 if (match_tag) {
                     match_filter = true;
+                    release_name_bind_to_tag = true;
                     release_name = match_tag[1];
                 } else {
                     console.log('Current event is not a tag push.');
@@ -178,10 +181,14 @@ async function run() {
             console.log(`Try to get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
         }
 
-        console.log("============================= v3 API: getReleaseByTag =============================");
+        if (is_verbose) {
+            console.log("============================= v3 API: getReleaseByTag =============================");
+        }
         if (deploy_release && deploy_release.headers) {
             console.log(`Try to get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status}`);
-            // console.log(`${action_github.context.repo.repo}.getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`);
+            if (is_verbose) {
+                console.log(`getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`);
+            }
         }
 
 
@@ -194,13 +201,16 @@ async function run() {
         // https://developer.github.com/v3/repos/releases/#create-a-release
         if (deploy_release && deploy_release.data) {
             try {
+                if (is_verbose) {
+                    console.log("============================= v3 API: updateRelease =============================");
+                }
                 console.log(`Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
                 deploy_release = await octokit.repos.updateRelease({
                     owner: action_github.context.repo.owner,
                     repo: action_github.context.repo.repo,
                     release_id: deploy_release.data.id,
                     tag_name: release_name,
-                    target_commitish: action_github.context.sha,
+                    target_commitish: release_name_bind_to_tag? undefined: action_github.context.sha,
                     name: release_name,
                     body: deploy_release.data.body,
                     draft: is_draft,
@@ -211,6 +221,9 @@ async function run() {
                 release_tag_name = deploy_release.data.tag_name;
                 release_commitish = deploy_release.data.target_commitish;
                 console.log(`Update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                if (is_verbose) {
+                    console.log(`updateRelease.data = ${JSON.stringify(deploy_release.data)}`);
+                }
             } catch (error) {
                 var msg = `Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
                 msg += `\r\n${error.stack}`;
@@ -219,12 +232,15 @@ async function run() {
             }
         } else {
             try {
+                if (is_verbose) {
+                    console.log("============================= v3 API: createRelease =============================");
+                }
                 console.log(`Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
                 deploy_release = await octokit.repos.createRelease({
                     owner: action_github.context.repo.owner,
                     repo: action_github.context.repo.repo,
                     tag_name: release_name,
-                    target_commitish: action_github.context.sha,
+                    target_commitish: release_name_bind_to_tag? undefined: action_github.context.sha,
                     name: release_name,
                     // body: "",
                     draft: is_draft,
@@ -235,6 +251,9 @@ async function run() {
                 release_tag_name = deploy_release.data.tag_name;
                 release_commitish = deploy_release.data.target_commitish;
                 console.log(`Create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                if (is_verbose) {
+                    console.log(`createRelease.data = ${JSON.stringify(deploy_release.data)}`);
+                }
             } catch (error) {
                 var msg = `Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
                 msg += `\r\n${error.stack}`;
@@ -265,6 +284,9 @@ async function run() {
         }
 
         // Delete old assets.
+        if (is_verbose && pending_to_delete) {
+            console.log("============================= v3 API: deleteReleaseAsset =============================");
+        }
         for (const asset of pending_to_delete) {
             try {
                 // const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
@@ -282,6 +304,9 @@ async function run() {
         }
 
         // Upload new assets
+        if (is_verbose && pending_to_upload) {
+            console.log("============================= v3 API: uploadReleaseAsset =============================");
+        }
         for (const file_path of pending_to_upload) {
             const file_base_name = path.basename(file_path);
             try {
@@ -303,6 +328,10 @@ async function run() {
                     action_core.setFailed(msg);
                 } else {
                     console.log(`Upload asset: ${file_base_name} success`);
+                }
+
+                if (is_verbose) {
+                    console.log(`uploadReleaseAsset.data = ${JSON.stringify(upload_rsp.data)}`);
                 }
             } catch (error) {
                 const msg = `Upload asset: ${file_base_name} failed => ${error.message}\r\n${error.stack}`;
