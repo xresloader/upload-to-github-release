@@ -38,6 +38,8 @@ with:
   draft: true
 ```
 
+You can find more samples on https://github.com/xresloader/upload-to-github-release-test/blob/master/.github/workflows/ .
+
 ## Environments
 
 ### `GITHUB_TOKEN`
