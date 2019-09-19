@@ -84,6 +84,12 @@ async function run() {
                 console.log(`Current event will be skipped.`);
                 return;
             }
+        } else if (action_github.context.ref) {
+            // try get branch name
+            const match_branch = action_github.context.ref.match(/([^\/]+)$/);
+            if (match_branch && match_branch.length > 1) { 
+                release_name = match_branch[1] + '-' + action_github.context.sha.substr(0, 8);
+            }
         }
 
         const upload_files = await globby(upload_files_pattern);
