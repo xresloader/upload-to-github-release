@@ -1,6 +1,9 @@
 name: NPM Publish
 
-on: [push]
+on:
+  push:
+    tags:
+      - '*'
 
 jobs:
   build:
@@ -29,6 +32,5 @@ jobs:
           chmod 600 "$NPM_CONFIG_USERCONFIG" ;
         fi
 
-        if [ "x${GITHUB_REF:0:10}" == "xrefs/tags/" ]; then
-          npm publish ;
-        fi
+        npm publish ;
+
