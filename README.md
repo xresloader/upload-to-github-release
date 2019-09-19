@@ -19,11 +19,11 @@ Github Action to deploy files to github release
 ![Dev dependency: jest-circus](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/jest-circus)
 ![Dev dependency: ts-jest](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/ts-jest)
 
-![npm](https://img.shields.io/npm/v/upload-to-github-release)
-![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/xresloader/upload-to-github-release)
-![GitHub repo size](https://img.shields.io/github/repo-size/xresloader/upload-to-github-release)
-![GitHub forks](https://img.shields.io/github/forks/xresloader/upload-to-github-release)
-![GitHub stars](https://img.shields.io/github/stars/xresloader/upload-to-github-release)
+[![npm](https://img.shields.io/npm/v/upload-to-github-release)](https://www.npmjs.com/package/upload-to-github-release)
+[![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/xresloader/upload-to-github-release)](https://github.com/xresloader/upload-to-github-release)
+[![GitHub repo size](https://img.shields.io/github/repo-size/xresloader/upload-to-github-release)](https://github.com/xresloader/upload-to-github-release)
+[![GitHub forks](https://img.shields.io/github/forks/xresloader/upload-to-github-release)](https://github.com/xresloader/upload-to-github-release)
+[![GitHub stars](https://img.shields.io/github/stars/xresloader/upload-to-github-release)](https://github.com/xresloader/upload-to-github-release)
 
 ## Example usage
 
