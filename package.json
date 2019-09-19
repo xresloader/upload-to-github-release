@@ -1,6 +1,6 @@
 {
   "name": "upload-to-github-release",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Github Action to deploy files to github release",
   "main": "index.js",
   "scripts": {
