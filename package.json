@@ -18,7 +18,8 @@
     "action",
     "asset",
     "release",
-    "upload"
+    "upload",
+    "deploy"
   ],
   "author": "owent",
   "license": "MIT",

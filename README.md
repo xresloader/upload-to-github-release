@@ -2,17 +2,41 @@
 
 Github Action to deploy files to github release
 
+[![GitHub Actions status](https://github.com/xresloader/upload-to-github-release/workflows/NPM%20Publish/badge.svg)](https://github.com/xresloader/upload-to-github-release/actions)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/xresloader/upload-to-github-release)](https://github.com/xresloader/upload-to-github-release/releases)
 [![GitHub](https://img.shields.io/github/license/xresloader/upload-to-github-release)](LICENSE)
 
 ![Dependency: @actions/core](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/@actions/core)
 ![Dependency: @actions/github](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/@actions/github)
 ![Dependency: @actions/globby](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/globby)
+![Dependency: mime](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/mime)
 
+![Dev dependency: typescript](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/typescript)
+![Dev dependency: @types/jest](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/@types/jest)
+![Dev dependency: @types/node](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/@types/node)
+![Dev dependency: @zeit/ncc](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/@zeit/ncc)
+![Dev dependency: jest](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/jest)
+![Dev dependency: jest-circus](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/jest-circus)
+![Dev dependency: ts-jest](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/ts-jest)
+
+![npm](https://img.shields.io/npm/v/upload-to-github-release)
+![npm downloads](https://img.shields.io/npm/dt/upload-to-github-release)
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/xresloader/upload-to-github-release)
 ![GitHub repo size](https://img.shields.io/github/repo-size/xresloader/upload-to-github-release)
-![GitHub forks](https://img.shields.io/github/forks/xresloader/upload-to-github-release?style=social)
-![GitHub stars](https://img.shields.io/github/stars/xresloader/upload-to-github-release?style=social)
+![GitHub forks](https://img.shields.io/github/forks/xresloader/upload-to-github-release)
+![GitHub stars](https://img.shields.io/github/stars/xresloader/upload-to-github-release)
+
+## Example usage
+
+```yml
+uses: xresloader/upload-to-github-release@master
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+with:
+  file: "*.md"
+  tags: true
+  draft: true
+```
 
 ## Environments
 
@@ -77,19 +101,6 @@ The release tag name.
 ### `release_commitish`
 
 The release commitish.
-
-
-## Example usage
-
-```yml
-uses: xresloader/upload-to-github-release@master
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-with:
-  file: "*.md"
-  tags: true
-  draft: true
-```
 
 ## For Developer
 
