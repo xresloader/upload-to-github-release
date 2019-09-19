@@ -54,7 +54,7 @@ async function run() {
 
         var release_name = "Release-" + action_github.context.sha.substr(0, 8);
         var release_name_bind_to_tag = false;
-        if (with_branches || with_tags) {
+        if ((with_branches && with_branches.length > 0) || with_tags) {
             // check branches or tags
             var match_filter = false;
             if (with_tags) {
@@ -63,18 +63,20 @@ async function run() {
                     match_filter = true;
                     release_name_bind_to_tag = true;
                     release_name = match_tag[1];
+                    console.log('Found tag push: ${match_tag[1]}.');
                 } else {
                     console.log('Current event is not a tag push.');
                 }
             }
 
-            if (!match_filter && with_branches) {
+            if (!match_filter && (with_branches && with_branches.length > 0)) {
                 const match_branch = action_github.context.ref.match(/refs\/heads\/(.*)/);
                 if (match_branch) {
                     const selected_branch = with_branches.filter((s) => s == match_branch[1]);
-                    if (selected_branch) {
+                    if (selected_branch && selected_branch.length > 0) {
                         match_filter = true;
                         release_name = match_branch[1] + '-' + action_github.context.sha.substr(0, 8);
+                        console.log('Found branch push: ${match_tag[1]}.');
                     }
                 }
 
@@ -96,7 +98,7 @@ async function run() {
         }
 
         const upload_files = await globby(upload_files_pattern);
-        if (!upload_files) {
+        if (!upload_files || upload_files.length <= 0) {
             action_core.setFailed(`Can not find any file by ${upload_files_pattern}`);
             return;
         }
@@ -212,7 +214,7 @@ async function run() {
                     tag_name: release_name,
                     target_commitish: release_name_bind_to_tag? undefined: action_github.context.sha,
                     name: release_name,
-                    body: deploy_release.data.body,
+                    body: deploy_release.data.body || undefined,
                     draft: is_draft,
                     prerelease: is_prerelease
                 });
@@ -284,7 +286,7 @@ async function run() {
         }
 
         // Delete old assets.
-        if (is_verbose && pending_to_delete) {
+        if (is_verbose && pending_to_delete.length > 0) {
             console.log("============================= v3 API: deleteReleaseAsset =============================");
         }
         for (const asset of pending_to_delete) {
@@ -304,7 +306,7 @@ async function run() {
         }
 
         // Upload new assets
-        if (is_verbose && pending_to_upload) {
+        if (is_verbose && pending_to_upload.length > 0) {
             console.log("============================= v3 API: uploadReleaseAsset =============================");
         }
         for (const file_path of pending_to_upload) {
