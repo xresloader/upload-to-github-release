@@ -1,4 +1,4 @@
-name: 'UploadToGithubRelease'
+name: 'Upload To Github Release'
 description: 'Github Action to deploy files to github release'
 author: 'owent'
 inputs:
