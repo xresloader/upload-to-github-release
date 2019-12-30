@@ -32,6 +32,8 @@ async function run() {
         const with_tags = getInputAsBool('tags');
         const with_branches = getInputAsArray('branches');
         const is_verbose = getInputAsBool('verbose');
+        const custom_tag_name = (action_core.getInput('tag_name') || '').trim();
+        const update_latest_release = getInputAsBool('update_latest_release');
 
         if (typeof (github_token) != 'string') {
             action_core.setFailed("token is invalid");
@@ -54,7 +56,10 @@ async function run() {
 
         var release_name = "Release-" + action_github.context.sha.substr(0, 8);
         var release_name_bind_to_tag = false;
-        if ((with_branches && with_branches.length > 0) || with_tags) {
+        if (custom_tag_name) {
+            release_name = custom_tag_name;
+            release_name_bind_to_tag = true;
+        } else if ((with_branches && with_branches.length > 0) || with_tags) {
             // check branches or tags
             var match_filter = false;
             if (with_tags) {
@@ -169,18 +174,34 @@ async function run() {
         console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
         **/
         // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
-        var deploy_release: Octokit.Response<Octokit.ReposGetReleaseByTagResponse>
+        var deploy_release: 
+            Octokit.Response<Octokit.ReposGetReleaseByTagResponse>
+            | Octokit.Response<Octokit.ReposGetLatestReleaseResponse>
             | Octokit.Response<Octokit.ReposCreateReleaseResponse>
             | Octokit.Response<Octokit.ReposUpdateReleaseResponse>
             | undefined = undefined;
-        try {
-            deploy_release = await octokit.repos.getReleaseByTag({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
-                tag: release_name
-            });
-        } catch (error) {
-            console.log(`Try to get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+
+        if (update_latest_release) {
+            try {
+                deploy_release = await octokit.repos.getLatestRelease({
+                    owner: action_github.context.repo.owner,
+                    repo: action_github.context.repo.repo
+                });
+            } catch (error) {
+                console.log(`Try to get latest release from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+            }
+        }
+
+        if (!(deploy_release && deploy_release.data)) {
+            try {
+                deploy_release = await octokit.repos.getReleaseByTag({
+                    owner: action_github.context.repo.owner,
+                    repo: action_github.context.repo.repo,
+                    tag: release_name
+                });
+            } catch (error) {
+                console.log(`Try to get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+            }
         }
 
         if (is_verbose) {
@@ -263,7 +284,80 @@ async function run() {
                 action_core.setFailed(msg);
             }
         }
+
+        // Check tag references
+        var git_tag_ref : Octokit.Response<Octokit.GitGetRefResponse> 
+            | undefined = undefined;
+        try {
+            if (is_verbose) {
+                console.log("============================= v3 API: getRef =============================");
+            }
+            console.log(`Try to get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            git_tag_ref = await octokit.git.getRef({
+                owner: action_github.context.repo.owner,
+                repo: action_github.context.repo.repo,
+                ref: `refs/tags/${release_name}`
+            });
+            console.log(`Get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+            if (is_verbose) {
+                console.log(`getRef.data = ${JSON.stringify(git_tag_ref.data)}`);
+            }
+        } catch (error) {
+            var msg = `Try to get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+            msg += `\r\n${error.stack}`;
+            console.log(msg);
+        }
+
+        if (!(git_tag_ref && git_tag_ref.data)) {
+            try {
+                if (is_verbose) {
+                    console.log("============================= v3 API: createRef =============================");
+                }
+                console.log(`Try to create git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                const res = await octokit.git.createRef({
+                    owner: action_github.context.repo.owner,
+                    repo: action_github.context.repo.repo,
+                    ref: `refs/tags/${release_name}`,
+                    sha: action_github.context.sha
+                });
+                console.log(`Create refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                if (is_verbose) {
+                    console.log(`createRef.data = ${JSON.stringify(res.data)}`);
+                }
+            } catch (error) {
+                var msg = `Try to create git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+                msg += `\r\n${error.stack}`;
+                console.log(msg);
+            } 
+        } else {
+            if (git_tag_ref.data.object.sha == action_github.context.sha) {
+                console.log(`Commit sha of refs/tags/${release_name} not changed.`);
+            } else {
+                try {
+                    if (is_verbose) {
+                        console.log("============================= v3 API: updateRef =============================");
+                    }
+                    console.log(`Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                    const res = await octokit.git.updateRef({
+                        owner: action_github.context.repo.owner,
+                        repo: action_github.context.repo.repo,
+                        ref: `refs/tags/${release_name}`,
+                        sha: action_github.context.sha,
+                        force: true
+                    });
+                    console.log(`Update refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                    if (is_verbose) {
+                        console.log(`updateRef.data = ${JSON.stringify(res.data)}`);
+                    }
+                } catch (error) {
+                    var msg = `Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+                    msg += `\r\n${error.stack}`;
+                    console.log(msg);
+                } 
+            }
+        }
         
+        // Collect assets to upload
         if (deploy_release && deploy_release.data && deploy_release.data.assets) {
             const old_asset_map = {};
             for (const asset of deploy_release.data.assets || []) {

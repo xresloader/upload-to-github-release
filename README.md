@@ -85,6 +85,18 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Default** : []
 
+### `tag_name`
+
+**Optional** Set custom tag name.
+
+**Default** : ""
+
+### `update_latest_release`
+
+**Optional** With update_latest_release: true, this action will try to update latest release first.
+
+**Default** : false
+
 ## Outputs
 
 ### `release_name`
