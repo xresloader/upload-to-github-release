@@ -214,6 +214,78 @@ async function run() {
             }
         }
 
+        // Check tag references
+        var git_tag_ref : Octokit.Response<Octokit.GitGetRefResponse> 
+            | undefined = undefined;
+        try {
+            if (is_verbose) {
+                console.log("============================= v3 API: getRef =============================");
+            }
+            console.log(`Try to get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            git_tag_ref = await octokit.git.getRef({
+                owner: action_github.context.repo.owner,
+                repo: action_github.context.repo.repo,
+                ref: `tags/${release_name}`
+            });
+            console.log(`Get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+            if (is_verbose) {
+                console.log(`getRef.data = ${JSON.stringify(git_tag_ref.data)}`);
+            }
+        } catch (error) {
+            var msg = `Try to get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+            msg += `\r\n${error.stack}`;
+            console.log(msg);
+        }
+
+        if (!(git_tag_ref && git_tag_ref.data)) {
+            try {
+                if (is_verbose) {
+                    console.log("============================= v3 API: createRef =============================");
+                }
+                console.log(`Try to create git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                const res = await octokit.git.createRef({
+                    owner: action_github.context.repo.owner,
+                    repo: action_github.context.repo.repo,
+                    ref: `refs/tags/${release_name}`,
+                    sha: action_github.context.sha
+                });
+                console.log(`Create refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                if (is_verbose) {
+                    console.log(`createRef.data = ${JSON.stringify(res.data)}`);
+                }
+            } catch (error) {
+                var msg = `Try to create git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+                msg += `\r\n${error.stack}`;
+                console.log(msg);
+            } 
+        } else {
+            if (git_tag_ref.data.object.sha == action_github.context.sha) {
+                console.log(`Commit sha of refs/tags/${release_name} not changed.`);
+            } else {
+                try {
+                    if (is_verbose) {
+                        console.log("============================= v3 API: updateRef =============================");
+                    }
+                    console.log(`Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                    const res = await octokit.git.updateRef({
+                        owner: action_github.context.repo.owner,
+                        repo: action_github.context.repo.repo,
+                        ref: `tags/${release_name}`,
+                        sha: action_github.context.sha,
+                        force: true
+                    });
+                    console.log(`Update refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                    if (is_verbose) {
+                        console.log(`updateRef.data = ${JSON.stringify(res.data)}`);
+                    }
+                } catch (error) {
+                    var msg = `Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+                    msg += `\r\n${error.stack}`;
+                    console.log(msg);
+                } 
+            }
+        }
+
 
         const pending_to_delete : any[] = [];
         const pending_to_upload : string[] = [];
@@ -282,78 +354,6 @@ async function run() {
                 msg += `\r\n${error.stack}`;
                 console.log(msg);
                 action_core.setFailed(msg);
-            }
-        }
-
-        // Check tag references
-        var git_tag_ref : Octokit.Response<Octokit.GitGetRefResponse> 
-            | undefined = undefined;
-        try {
-            if (is_verbose) {
-                console.log("============================= v3 API: getRef =============================");
-            }
-            console.log(`Try to get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
-            git_tag_ref = await octokit.git.getRef({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
-                ref: `refs/tags/${release_name}`
-            });
-            console.log(`Get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
-            if (is_verbose) {
-                console.log(`getRef.data = ${JSON.stringify(git_tag_ref.data)}`);
-            }
-        } catch (error) {
-            var msg = `Try to get git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
-            msg += `\r\n${error.stack}`;
-            console.log(msg);
-        }
-
-        if (!(git_tag_ref && git_tag_ref.data)) {
-            try {
-                if (is_verbose) {
-                    console.log("============================= v3 API: createRef =============================");
-                }
-                console.log(`Try to create git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
-                const res = await octokit.git.createRef({
-                    owner: action_github.context.repo.owner,
-                    repo: action_github.context.repo.repo,
-                    ref: `refs/tags/${release_name}`,
-                    sha: action_github.context.sha
-                });
-                console.log(`Create refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
-                if (is_verbose) {
-                    console.log(`createRef.data = ${JSON.stringify(res.data)}`);
-                }
-            } catch (error) {
-                var msg = `Try to create git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
-                msg += `\r\n${error.stack}`;
-                console.log(msg);
-            } 
-        } else {
-            if (git_tag_ref.data.object.sha == action_github.context.sha) {
-                console.log(`Commit sha of refs/tags/${release_name} not changed.`);
-            } else {
-                try {
-                    if (is_verbose) {
-                        console.log("============================= v3 API: updateRef =============================");
-                    }
-                    console.log(`Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
-                    const res = await octokit.git.updateRef({
-                        owner: action_github.context.repo.owner,
-                        repo: action_github.context.repo.repo,
-                        ref: `refs/tags/${release_name}`,
-                        sha: action_github.context.sha,
-                        force: true
-                    });
-                    console.log(`Update refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
-                    if (is_verbose) {
-                        console.log(`updateRef.data = ${JSON.stringify(res.data)}`);
-                    }
-                } catch (error) {
-                    var msg = `Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
-                    msg += `\r\n${error.stack}`;
-                    console.log(msg);
-                } 
             }
         }
         
