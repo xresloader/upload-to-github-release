@@ -230,20 +230,6 @@ async function run() {
             console.log(`Get git tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
             if (is_verbose) {
                 console.log(`getRef.data = ${JSON.stringify(git_tag_ref.data)}`);
-
-                const all_refs_1 = await octokit.git.listMatchingRefs({
-                    owner: action_github.context.repo.owner,
-                    repo: action_github.context.repo.repo,
-                    ref: `tags/${release_name}`
-                });
-                console.log(`listMatchingRefs(tags/${release_name}).data = ${JSON.stringify(all_refs_1.data)}`);
-
-                const all_refs_2 = await octokit.git.listMatchingRefs({
-                    owner: action_github.context.repo.owner,
-                    repo: action_github.context.repo.repo,
-                    ref: ''
-                });
-                console.log(`listMatchingRefs().data = ${JSON.stringify(all_refs_2.data)}`);
             }
         } catch (error) {
             var msg = `Get git tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}: ${error.message}`;
