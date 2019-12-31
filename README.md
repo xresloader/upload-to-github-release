@@ -97,6 +97,12 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Default** : false
 
+### `verbose`
+
+**Optional** Print the verbose logs to debug.
+
+**Default** : false
+
 ## Outputs
 
 ### `release_name`
