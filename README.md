@@ -2,7 +2,7 @@
 
 Github Action for deploy files to github release.
 
-Marketplace: https://github.com/marketplace/actions/uploadtogithubrelease
+Marketplace: https://github.com/marketplace/actions/upload-to-github-release
 
 [![GitHub Actions status](https://github.com/xresloader/upload-to-github-release/workflows/NPM%20Publish/badge.svg)](https://github.com/xresloader/upload-to-github-release/actions)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/xresloader/upload-to-github-release)](https://github.com/marketplace/actions/uploadtogithubrelease)
