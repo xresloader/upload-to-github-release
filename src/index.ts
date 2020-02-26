@@ -386,8 +386,9 @@ async function run() {
         }
         for (const file_path of pending_to_upload) {
             const file_base_name = path.basename(file_path);
+            const max_retry_times = 3;
             var failed_error_msg: string | null = null;
-            for (var retry_tims = 0; retry_tims <= 3; ++ retry_tims) {
+            for (var retry_tims = 0; retry_tims <= max_retry_times; ++ retry_tims) {
                 try {
                     if (0 === retry_tims) {
                         console.log(`Uploading asset: ${file_path} ...`);
@@ -413,6 +414,7 @@ async function run() {
                         }
                     } else {
                         console.log(`Upload asset: ${file_base_name} success`);
+                        retry_tims = max_retry_times; // success and not need to retry
                     }
 
                     if (is_verbose) {
