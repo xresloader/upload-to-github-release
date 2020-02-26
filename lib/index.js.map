@@ -6581,20 +6581,48 @@ function run() {
                     try {
                         console.log(`Start uploading asset${retry_msg}: ${file_path} ...`);
                         // Maybe upload failed before, try to remove old incompleted file
+                        // Only graphql API(v4) can get bad assets
                         if (0 !== retry_tims) {
-                            console.log(`Renew release${retry_msg} information ...`);
-                            const release_data = yield octokit.repos.getRelease({
-                                owner: action_github.context.repo.owner,
-                                repo: action_github.context.repo.repo,
-                                release_id: release_id
-                            });
-                            for (const asset of release_data.data.assets) {
+                            console.log(`============================= v4 API: query { repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") } =============================`);
+                            const repo_info_of_release = yield octokit.graphql(`query {
+                            repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") { 
+                                release (tagName: "${release_tag_name}") {
+                                id,
+                                name,
+                                isDraft,
+                                resourcePath,
+                                tag {
+                                    id, 
+                                    name,
+                                    prefix
+                                },
+                                updatedAt,
+                                url,
+                                releaseAssets(last: 5) {
+                                    nodes {
+                                    id,
+                                    name,
+                                    size,
+                                    downloadUrl
+                                    }
+                                }
+                                }
+                            }
+                        }`);
+                            if (is_verbose) {
+                                console.log(`${retry_msg}v4 API: query = ${JSON.stringify(repo_info_of_release)}`);
+                            }
+                            const assets = (((((repo_info_of_release || {}).data || {}).repository || {})
+                                .release || {}).releaseAssets || {}).nodes || [];
+                            for (const asset of assets) {
                                 if (asset.name == file_base_name) {
-                                    console.log(`Found old asset ${file_base_name}${retry_msg}: deleting ...`);
+                                    const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
+                                    const asset_v3_id = pick_id ? parseInt(pick_id[0]) : 0;
+                                    console.log(`Found old asset ${file_base_name}${retry_msg}: deleting id ${asset_v3_id} ...`);
                                     const delete_rsp = yield octokit.repos.deleteReleaseAsset({
                                         owner: action_github.context.repo.owner,
                                         repo: action_github.context.repo.repo,
-                                        asset_id: asset.id
+                                        asset_id: asset_v3_id
                                     });
                                     if (204 == delete_rsp.status) {
                                         console.log(`Delete old asset${retry_msg}: ${asset.name} success`);
