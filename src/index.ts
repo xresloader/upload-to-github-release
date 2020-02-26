@@ -175,10 +175,10 @@ async function run() {
         **/
         // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
         var deploy_release: 
-            Octokit.Response<Octokit.ReposGetReleaseByTagResponse>
-            | Octokit.Response<Octokit.ReposGetLatestReleaseResponse>
-            | Octokit.Response<Octokit.ReposCreateReleaseResponse>
-            | Octokit.Response<Octokit.ReposUpdateReleaseResponse>
+            Octokit.Octokit.Response<Octokit.Octokit.ReposGetReleaseByTagResponse>
+            | Octokit.Octokit.Response<Octokit.Octokit.ReposGetLatestReleaseResponse>
+            | Octokit.Octokit.Response<Octokit.Octokit.ReposCreateReleaseResponse>
+            | Octokit.Octokit.Response<Octokit.Octokit.ReposUpdateReleaseResponse>
             | undefined = undefined;
 
         if (update_latest_release) {
@@ -215,7 +215,7 @@ async function run() {
         }
 
         // Check tag references
-        var git_tag_ref : Octokit.Response<Octokit.GitGetRefResponse> 
+        var git_tag_ref : Octokit.Octokit.Response<Octokit.Octokit.GitGetRefResponse> 
             | undefined = undefined;
         try {
             if (is_verbose) {
@@ -386,34 +386,47 @@ async function run() {
         }
         for (const file_path of pending_to_upload) {
             const file_base_name = path.basename(file_path);
-            try {
-                console.log(`Uploading asset: ${file_path} ...`);
-                const find_mime = mime.getType(path.extname(file_path));
-                const upload_rsp = await octokit.repos.uploadReleaseAsset({
-                    url: upload_url,
-                    headers: {
-                        "content-type": find_mime || "application/octet-stream",
-                        "content-length": fs.statSync(file_path).size
-                    },
-                    name: file_base_name,
-                    file: fs.createReadStream(file_path)
-                });
+            var failed_error_msg: string | null = null;
+            for (var retry_tims = 0; retry_tims <= 3; ++ retry_tims) {
+                try {
+                    if (0 === retry_tims) {
+                        console.log(`Uploading asset: ${file_path} ...`);
+                    } else {
+                        console.log(`Uploading asset(${retry_tims} retry): ${file_path} ...`);
+                    }
+                    const find_mime = mime.getType(path.extname(file_path));
+                    const upload_rsp = await octokit.repos.uploadReleaseAsset({
+                        url: upload_url,
+                        headers: {
+                            "content-type": find_mime || "application/octet-stream",
+                            "content-length": fs.statSync(file_path).size
+                        },
+                        name: file_base_name,
+                        data: fs.createReadStream(file_path)
+                    });
 
-                if (200 != (upload_rsp.status - upload_rsp.status % 100)) {
-                    const msg = `Upload asset: ${file_base_name} failed => ${upload_rsp.headers.status}`;
+                    if (200 != (upload_rsp.status - upload_rsp.status % 100)) {
+                        const msg = `Upload asset: ${file_base_name} failed => ${upload_rsp.headers.status}`;
+                        console.log(msg);
+                        if (failed_error_msg === null) {
+                            failed_error_msg = msg;
+                        }
+                    } else {
+                        console.log(`Upload asset: ${file_base_name} success`);
+                    }
+
+                    if (is_verbose) {
+                        console.log(`uploadReleaseAsset.data = ${JSON.stringify(upload_rsp.data)}`);
+                    }
+                } catch (error) {
+                    const msg = `Upload asset: ${file_base_name} failed => ${error.message}\r\n${error.stack}`;
                     console.log(msg);
-                    action_core.setFailed(msg);
-                } else {
-                    console.log(`Upload asset: ${file_base_name} success`);
+                    action_core.setFailed(msg)
                 }
+            }
 
-                if (is_verbose) {
-                    console.log(`uploadReleaseAsset.data = ${JSON.stringify(upload_rsp.data)}`);
-                }
-            } catch (error) {
-                const msg = `Upload asset: ${file_base_name} failed => ${error.message}\r\n${error.stack}`;
-                console.log(msg);
-                action_core.setFailed(msg)
+            if (failed_error_msg !== null) {
+                action_core.setFailed(failed_error_msg);
             }
         }
 
