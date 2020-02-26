@@ -6453,6 +6453,7 @@ function run() {
             var release_url = deploy_release ? deploy_release.data.url : "";
             var release_tag_name = deploy_release ? deploy_release.data.tag_name : "";
             var release_commitish = deploy_release ? deploy_release.data.target_commitish : "";
+            var release_id = deploy_release ? deploy_release.data.id : 0;
             // https://developer.github.com/v3/repos/releases/#create-a-release
             if (deploy_release && deploy_release.data) {
                 try {
@@ -6463,7 +6464,7 @@ function run() {
                     deploy_release = yield octokit.repos.updateRelease({
                         owner: action_github.context.repo.owner,
                         repo: action_github.context.repo.repo,
-                        release_id: deploy_release.data.id,
+                        release_id: release_id,
                         tag_name: release_name,
                         target_commitish: release_name_bind_to_tag ? undefined : action_github.context.sha,
                         name: release_name,
@@ -6507,6 +6508,7 @@ function run() {
                     release_url = deploy_release.data.url;
                     release_tag_name = deploy_release.data.tag_name;
                     release_commitish = deploy_release.data.target_commitish;
+                    release_id = deploy_release.data.id;
                     console.log(`Create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
                     if (is_verbose) {
                         console.log(`createRelease.data = ${JSON.stringify(deploy_release.data)}`);
@@ -6575,12 +6577,34 @@ function run() {
                 const max_retry_times = 3;
                 var failed_error_msg = null;
                 for (var retry_tims = 0; retry_tims <= max_retry_times; ++retry_tims) {
+                    const retry_msg = (0 === retry_tims) ? "" : `(${retry_tims} retry)`;
                     try {
-                        if (0 === retry_tims) {
-                            console.log(`Uploading asset: ${file_path} ...`);
-                        }
-                        else {
-                            console.log(`Uploading asset(${retry_tims} retry): ${file_path} ...`);
+                        console.log(`Start uploading asset${retry_msg}: ${file_path} ...`);
+                        // Maybe upload failed before, try to remove old incompleted file
+                        if (0 !== retry_tims) {
+                            console.log(`Renew release${retry_msg} information ...`);
+                            const release_data = yield octokit.repos.getRelease({
+                                owner: action_github.context.repo.owner,
+                                repo: action_github.context.repo.repo,
+                                release_id: release_id
+                            });
+                            for (const asset of release_data.data.assets) {
+                                if (asset.name == file_base_name) {
+                                    console.log(`Found old asset ${file_base_name}${retry_msg}: deleting ...`);
+                                    const delete_rsp = yield octokit.repos.deleteReleaseAsset({
+                                        owner: action_github.context.repo.owner,
+                                        repo: action_github.context.repo.repo,
+                                        asset_id: asset.id
+                                    });
+                                    if (204 == delete_rsp.status) {
+                                        console.log(`Delete old asset${retry_msg}: ${asset.name} success`);
+                                    }
+                                    else {
+                                        console.log(`Delete old asset${retry_msg}: ${asset.name} => ${delete_rsp.headers.status}`);
+                                    }
+                                    break;
+                                }
+                            }
                         }
                         const find_mime = lite_1.default.getType(path.extname(file_path));
                         const upload_rsp = yield octokit.repos.uploadReleaseAsset({
@@ -6593,24 +6617,26 @@ function run() {
                             data: fs.createReadStream(file_path)
                         });
                         if (200 != (upload_rsp.status - upload_rsp.status % 100)) {
-                            const msg = `Upload asset: ${file_base_name} failed => ${upload_rsp.headers.status}`;
+                            const msg = `Upload asset${retry_msg}: ${file_base_name} failed => ${upload_rsp.headers.status}`;
                             console.log(msg);
                             if (failed_error_msg === null) {
                                 failed_error_msg = msg;
                             }
                         }
                         else {
-                            console.log(`Upload asset: ${file_base_name} success`);
+                            console.log(`Upload asset${retry_msg}: ${file_base_name} success`);
                             retry_tims = max_retry_times; // success and not need to retry
                         }
                         if (is_verbose) {
-                            console.log(`uploadReleaseAsset.data = ${JSON.stringify(upload_rsp.data)}`);
+                            console.log(`${retry_msg}uploadReleaseAsset.data = ${JSON.stringify(upload_rsp.data)}`);
                         }
                     }
                     catch (error) {
-                        const msg = `Upload asset: ${file_base_name} failed => ${error.message}\r\n${error.stack}`;
+                        const msg = `Upload asset${retry_msg}: ${file_base_name} failed => ${error.message}\r\n${error.stack}`;
                         console.log(msg);
-                        action_core.setFailed(msg);
+                        if (failed_error_msg === null) {
+                            failed_error_msg = msg;
+                        }
                     }
                 }
                 if (failed_error_msg !== null) {
