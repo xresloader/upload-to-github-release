@@ -6612,7 +6612,7 @@ function run() {
                             if (is_verbose) {
                                 console.log(`${retry_msg}v4 API: query = ${JSON.stringify(repo_info_of_release)}`);
                             }
-                            const assets = (((((repo_info_of_release || {}).data || {}).repository || {})
+                            const assets = ((((repo_info_of_release || {}).repository || {})
                                 .release || {}).releaseAssets || {}).nodes || [];
                             for (const asset of assets) {
                                 if (asset.name == file_base_name) {
@@ -6654,6 +6654,7 @@ function run() {
                         else {
                             console.log(`Upload asset${retry_msg}: ${file_base_name} success`);
                             retry_tims = max_retry_times; // success and not need to retry
+                            failed_error_msg = null;
                         }
                         if (is_verbose) {
                             console.log(`${retry_msg}uploadReleaseAsset.data = ${JSON.stringify(upload_rsp.data)}`);
