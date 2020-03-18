@@ -395,6 +395,89 @@ module.exports = require("https");
 
 /***/ }),
 
+/***/ 38:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+const path = __webpack_require__(622);
+const pathType = __webpack_require__(501);
+
+const getExtensions = extensions => extensions.length > 1 ? `{${extensions.join(',')}}` : extensions[0];
+
+const getPath = (filepath, cwd) => {
+	const pth = filepath[0] === '!' ? filepath.slice(1) : filepath;
+	return path.isAbsolute(pth) ? pth : path.join(cwd, pth);
+};
+
+const addExtensions = (file, extensions) => {
+	if (path.extname(file)) {
+		return `**/${file}`;
+	}
+
+	return `**/${file}.${getExtensions(extensions)}`;
+};
+
+const getGlob = (directory, options) => {
+	if (options.files && !Array.isArray(options.files)) {
+		throw new TypeError(`Expected \`files\` to be of type \`Array\` but received type \`${typeof options.files}\``);
+	}
+
+	if (options.extensions && !Array.isArray(options.extensions)) {
+		throw new TypeError(`Expected \`extensions\` to be of type \`Array\` but received type \`${typeof options.extensions}\``);
+	}
+
+	if (options.files && options.extensions) {
+		return options.files.map(x => path.posix.join(directory, addExtensions(x, options.extensions)));
+	}
+
+	if (options.files) {
+		return options.files.map(x => path.posix.join(directory, `**/${x}`));
+	}
+
+	if (options.extensions) {
+		return [path.posix.join(directory, `**/*.${getExtensions(options.extensions)}`)];
+	}
+
+	return [path.posix.join(directory, '**')];
+};
+
+module.exports = async (input, options) => {
+	options = {
+		cwd: process.cwd(),
+		...options
+	};
+
+	if (typeof options.cwd !== 'string') {
+		throw new TypeError(`Expected \`cwd\` to be of type \`string\` but received type \`${typeof options.cwd}\``);
+	}
+
+	const globs = await Promise.all([].concat(input).map(async x => {
+		const isDirectory = await pathType.isDirectory(getPath(x, options.cwd));
+		return isDirectory ? getGlob(x, options) : x;
+	}));
+
+	return [].concat.apply([], globs); // eslint-disable-line prefer-spread
+};
+
+module.exports.sync = (input, options) => {
+	options = {
+		cwd: process.cwd(),
+		...options
+	};
+
+	if (typeof options.cwd !== 'string') {
+		throw new TypeError(`Expected \`cwd\` to be of type \`string\` but received type \`${typeof options.cwd}\``);
+	}
+
+	const globs = [].concat(input).map(x => pathType.isDirectorySync(getPath(x, options.cwd)) ? getGlob(x, options) : x);
+
+	return [].concat.apply([], globs); // eslint-disable-line prefer-spread
+};
+
+
+/***/ }),
+
 /***/ 39:
 /***/ (function(module) {
 
@@ -3146,7 +3229,7 @@ exports.getUserAgent = getUserAgent;
 /***/ 215:
 /***/ (function(module) {
 
-module.exports = {"_from":"@octokit/rest@^16.43.1","_id":"@octokit/rest@16.43.1","_inBundle":false,"_integrity":"sha512-gfFKwRT/wFxq5qlNjnW2dh+qh74XgTQ2B179UX5K1HYCluioWj8Ndbgqw2PVqa1NnVJkGHp2ovMpVn/DImlmkw==","_location":"/@octokit/rest","_phantomChildren":{},"_requested":{"type":"range","registry":true,"raw":"@octokit/rest@^16.43.1","name":"@octokit/rest","escapedName":"@octokit%2frest","scope":"@octokit","rawSpec":"^16.43.1","saveSpec":null,"fetchSpec":"^16.43.1"},"_requiredBy":["/@actions/github"],"_resolved":"http://mirrors.tencent.com/npm/@octokit%2frest/-/rest-16.43.1.tgz","_shasum":"3b11e7d1b1ac2bbeeb23b08a17df0b20947eda6b","_spec":"@octokit/rest@^16.43.1","_where":"D:\\workspace\\projs\\xresloader\\upload-to-github-release\\node_modules\\@actions\\github","author":{"name":"Gregor Martynus","url":"https://github.com/gr2m"},"bugs":{"url":"https://github.com/octokit/rest.js/issues"},"bundleDependencies":false,"bundlesize":[{"path":"./dist/octokit-rest.min.js.gz","maxSize":"33 kB"}],"contributors":[{"name":"Mike de Boer","email":"info@mikedeboer.nl"},{"name":"Fabian Jakobs","email":"fabian@c9.io"},{"name":"Joe Gallo","email":"joe@brassafrax.com"},{"name":"Gregor Martynus","url":"https://github.com/gr2m"}],"dependencies":{"@octokit/auth-token":"^2.4.0","@octokit/plugin-paginate-rest":"^1.1.1","@octokit/plugin-request-log":"^1.0.0","@octokit/plugin-rest-endpoint-methods":"2.4.0","@octokit/request":"^5.2.0","@octokit/request-error":"^1.0.2","atob-lite":"^2.0.0","before-after-hook":"^2.0.0","btoa-lite":"^1.0.0","deprecation":"^2.0.0","lodash.get":"^4.4.2","lodash.set":"^4.3.2","lodash.uniq":"^4.5.0","octokit-pagination-methods":"^1.1.0","once":"^1.4.0","universal-user-agent":"^4.0.0"},"deprecated":false,"description":"GitHub REST API client for Node.js","devDependencies":{"@gimenete/type-writer":"^0.1.3","@octokit/auth":"^1.1.1","@octokit/fixtures-server":"^5.0.6","@octokit/graphql":"^4.2.0","@types/node":"^13.1.0","bundlesize":"^0.18.0","chai":"^4.1.2","compression-webpack-plugin":"^3.1.0","cypress":"^3.0.0","glob":"^7.1.2","http-proxy-agent":"^4.0.0","lodash.camelcase":"^4.3.0","lodash.merge":"^4.6.1","lodash.upperfirst":"^4.3.1","lolex":"^5.1.2","mkdirp":"^1.0.0","mocha":"^7.0.1","mustache":"^4.0.0","nock":"^11.3.3","npm-run-all":"^4.1.2","nyc":"^15.0.0","prettier":"^1.14.2","proxy":"^1.0.0","semantic-release":"^17.0.0","sinon":"^8.0.0","sinon-chai":"^3.0.0","sort-keys":"^4.0.0","string-to-arraybuffer":"^1.0.0","string-to-jsdoc-comment":"^1.0.0","typescript":"^3.3.1","webpack":"^4.0.0","webpack-bundle-analyzer":"^3.0.0","webpack-cli":"^3.0.0"},"files":["index.js","index.d.ts","lib","plugins"],"homepage":"https://github.com/octokit/rest.js#readme","keywords":["octokit","github","rest","api-client"],"license":"MIT","name":"@octokit/rest","nyc":{"ignore":["test"]},"publishConfig":{"access":"public"},"release":{"publish":["@semantic-release/npm",{"path":"@semantic-release/github","assets":["dist/*","!dist/*.map.gz"]}]},"repository":{"type":"git","url":"git+https://github.com/octokit/rest.js.git"},"scripts":{"build":"npm-run-all build:*","build:browser":"npm-run-all build:browser:*","build:browser:development":"webpack --mode development --entry . --output-library=Octokit --output=./dist/octokit-rest.js --profile --json > dist/bundle-stats.json","build:browser:production":"webpack --mode production --entry . --plugin=compression-webpack-plugin --output-library=Octokit --output-path=./dist --output-filename=octokit-rest.min.js --devtool source-map","build:ts":"npm run -s update-endpoints:typescript","coverage":"nyc report --reporter=html && open coverage/index.html","generate-bundle-report":"webpack-bundle-analyzer dist/bundle-stats.json --mode=static --no-open --report dist/bundle-report.html","lint":"prettier --check '{lib,plugins,scripts,test}/**/*.{js,json,ts}' 'docs/*.{js,json}' 'docs/src/**/*' index.js README.md package.json","lint:fix":"prettier --write '{lib,plugins,scripts,test}/**/*.{js,json,ts}' 'docs/*.{js,json}' 'docs/src/**/*' index.js README.md package.json","postvalidate:ts":"tsc --noEmit --target es6 test/typescript-validate.ts","prebuild:browser":"mkdirp dist/","pretest":"npm run -s lint","prevalidate:ts":"npm run -s build:ts","start-fixtures-server":"octokit-fixtures-server","test":"nyc mocha test/mocha-node-setup.js \"test/*/**/*-test.js\"","test:browser":"cypress run --browser chrome","update-endpoints":"npm-run-all update-endpoints:*","update-endpoints:fetch-json":"node scripts/update-endpoints/fetch-json","update-endpoints:typescript":"node scripts/update-endpoints/typescript","validate:ts":"tsc --target es6 --noImplicitAny index.d.ts"},"types":"index.d.ts","version":"16.43.1"};
+module.exports = {"name":"@octokit/rest","version":"16.43.1","publishConfig":{"access":"public"},"description":"GitHub REST API client for Node.js","keywords":["octokit","github","rest","api-client"],"author":"Gregor Martynus (https://github.com/gr2m)","contributors":[{"name":"Mike de Boer","email":"info@mikedeboer.nl"},{"name":"Fabian Jakobs","email":"fabian@c9.io"},{"name":"Joe Gallo","email":"joe@brassafrax.com"},{"name":"Gregor Martynus","url":"https://github.com/gr2m"}],"repository":"https://github.com/octokit/rest.js","dependencies":{"@octokit/auth-token":"^2.4.0","@octokit/plugin-paginate-rest":"^1.1.1","@octokit/plugin-request-log":"^1.0.0","@octokit/plugin-rest-endpoint-methods":"2.4.0","@octokit/request":"^5.2.0","@octokit/request-error":"^1.0.2","atob-lite":"^2.0.0","before-after-hook":"^2.0.0","btoa-lite":"^1.0.0","deprecation":"^2.0.0","lodash.get":"^4.4.2","lodash.set":"^4.3.2","lodash.uniq":"^4.5.0","octokit-pagination-methods":"^1.1.0","once":"^1.4.0","universal-user-agent":"^4.0.0"},"devDependencies":{"@gimenete/type-writer":"^0.1.3","@octokit/auth":"^1.1.1","@octokit/fixtures-server":"^5.0.6","@octokit/graphql":"^4.2.0","@types/node":"^13.1.0","bundlesize":"^0.18.0","chai":"^4.1.2","compression-webpack-plugin":"^3.1.0","cypress":"^3.0.0","glob":"^7.1.2","http-proxy-agent":"^4.0.0","lodash.camelcase":"^4.3.0","lodash.merge":"^4.6.1","lodash.upperfirst":"^4.3.1","lolex":"^5.1.2","mkdirp":"^1.0.0","mocha":"^7.0.1","mustache":"^4.0.0","nock":"^11.3.3","npm-run-all":"^4.1.2","nyc":"^15.0.0","prettier":"^1.14.2","proxy":"^1.0.0","semantic-release":"^17.0.0","sinon":"^8.0.0","sinon-chai":"^3.0.0","sort-keys":"^4.0.0","string-to-arraybuffer":"^1.0.0","string-to-jsdoc-comment":"^1.0.0","typescript":"^3.3.1","webpack":"^4.0.0","webpack-bundle-analyzer":"^3.0.0","webpack-cli":"^3.0.0"},"types":"index.d.ts","scripts":{"coverage":"nyc report --reporter=html && open coverage/index.html","lint":"prettier --check '{lib,plugins,scripts,test}/**/*.{js,json,ts}' 'docs/*.{js,json}' 'docs/src/**/*' index.js README.md package.json","lint:fix":"prettier --write '{lib,plugins,scripts,test}/**/*.{js,json,ts}' 'docs/*.{js,json}' 'docs/src/**/*' index.js README.md package.json","pretest":"npm run -s lint","test":"nyc mocha test/mocha-node-setup.js \"test/*/**/*-test.js\"","test:browser":"cypress run --browser chrome","build":"npm-run-all build:*","build:ts":"npm run -s update-endpoints:typescript","prebuild:browser":"mkdirp dist/","build:browser":"npm-run-all build:browser:*","build:browser:development":"webpack --mode development --entry . --output-library=Octokit --output=./dist/octokit-rest.js --profile --json > dist/bundle-stats.json","build:browser:production":"webpack --mode production --entry . --plugin=compression-webpack-plugin --output-library=Octokit --output-path=./dist --output-filename=octokit-rest.min.js --devtool source-map","generate-bundle-report":"webpack-bundle-analyzer dist/bundle-stats.json --mode=static --no-open --report dist/bundle-report.html","update-endpoints":"npm-run-all update-endpoints:*","update-endpoints:fetch-json":"node scripts/update-endpoints/fetch-json","update-endpoints:typescript":"node scripts/update-endpoints/typescript","prevalidate:ts":"npm run -s build:ts","validate:ts":"tsc --target es6 --noImplicitAny index.d.ts","postvalidate:ts":"tsc --noEmit --target es6 test/typescript-validate.ts","start-fixtures-server":"octokit-fixtures-server"},"license":"MIT","files":["index.js","index.d.ts","lib","plugins"],"nyc":{"ignore":["test"]},"release":{"publish":["@semantic-release/npm",{"path":"@semantic-release/github","assets":["dist/*","!dist/*.map.gz"]}]},"bundlesize":[{"path":"./dist/octokit-rest.min.js.gz","maxSize":"33 kB"}]};
 
 /***/ }),
 
@@ -6208,29 +6291,36 @@ const lite_1 = __importDefault(__webpack_require__(825));
 // const io = require('@actions/io');
 // const tc = require('@actions/tool-cache');
 function getInputAsArray(name) {
-    return (action_core.getInput(name) || '').split(";").map(v => v.trim()).filter(v => !!v);
+    return (action_core.getInput(name) || "")
+        .split(";")
+        .map(v => v.trim())
+        .filter(v => !!v);
 }
 function getInputAsBool(name) {
-    const res = (action_core.getInput(name) || '').toLowerCase();
+    const res = (action_core.getInput(name) || "").toLowerCase();
     if (!res) {
         return false;
     }
-    return res != "false" && res != "disabled" && res != "0" && res != "no" && res != "disable";
+    return (res != "false" &&
+        res != "disabled" &&
+        res != "0" &&
+        res != "no" &&
+        res != "disable");
 }
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const github_token = (process.env['GITHUB_TOKEN'] || '').trim();
-            const upload_files_pattern = getInputAsArray('file');
-            const is_overwrite = action_core.getInput('overwrite');
-            const is_draft = getInputAsBool('draft');
-            const is_prerelease = getInputAsBool('prerelease');
-            const with_tags = getInputAsBool('tags');
-            const with_branches = getInputAsArray('branches');
-            const is_verbose = getInputAsBool('verbose');
-            const custom_tag_name = (action_core.getInput('tag_name') || '').trim();
-            const update_latest_release = getInputAsBool('update_latest_release');
-            if (typeof (github_token) != 'string') {
+            const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
+            const upload_files_pattern = getInputAsArray("file");
+            const is_overwrite = action_core.getInput("overwrite");
+            const is_draft = getInputAsBool("draft");
+            const is_prerelease = getInputAsBool("prerelease");
+            const with_tags = getInputAsBool("tags");
+            const with_branches = getInputAsArray("branches");
+            const is_verbose = getInputAsBool("verbose");
+            const custom_tag_name = (action_core.getInput("tag_name") || "").trim();
+            const update_latest_release = getInputAsBool("update_latest_release");
+            if (typeof github_token != "string") {
                 action_core.setFailed("token is invalid");
                 return;
             }
@@ -6240,7 +6330,7 @@ function run() {
             }
             // action_github.context.eventName = push
             // action_github.context.sha = ae7dc58d20ad51b3c8c37deca1bc07f3ae8526cd
-            // context.ref = refs/heads/BRANCH_NAME  or refs/tags/TAG_NAME   
+            // context.ref = refs/heads/BRANCH_NAME  or refs/tags/TAG_NAME
             // action_github.context.ref = refs/heads/master
             // action_github.context.action = xresloaderupload-to-github-release
             // action_github.context.actor = owt5008137
@@ -6261,20 +6351,21 @@ function run() {
                         match_filter = true;
                         release_name_bind_to_tag = true;
                         release_name = match_tag[1];
-                        console.log('Found tag push: ${match_tag[1]}.');
+                        console.log("Found tag push: ${match_tag[1]}.");
                     }
                     else {
-                        console.log('Current event is not a tag push.');
+                        console.log("Current event is not a tag push.");
                     }
                 }
-                if (!match_filter && (with_branches && with_branches.length > 0)) {
+                if (!match_filter && with_branches && with_branches.length > 0) {
                     const match_branch = action_github.context.ref.match(/refs\/heads\/(.*)/);
                     if (match_branch) {
-                        const selected_branch = with_branches.filter((s) => s == match_branch[1]);
+                        const selected_branch = with_branches.filter(s => s == match_branch[1]);
                         if (selected_branch && selected_branch.length > 0) {
                             match_filter = true;
-                            release_name = match_branch[1] + '-' + action_github.context.sha.substr(0, 8);
-                            console.log('Found branch push: ${match_tag[1]}.');
+                            release_name =
+                                match_branch[1] + "-" + action_github.context.sha.substr(0, 8);
+                            console.log("Found branch push: ${match_tag[1]}.");
                         }
                     }
                     if (!match_filter) {
@@ -6290,7 +6381,8 @@ function run() {
                 // try get branch name
                 const match_branch = action_github.context.ref.match(/([^\/]+)$/);
                 if (match_branch && match_branch.length > 1) {
-                    release_name = match_branch[1] + '-' + action_github.context.sha.substr(0, 8);
+                    release_name =
+                        match_branch[1] + "-" + action_github.context.sha.substr(0, 8);
                 }
             }
             const upload_files = yield globby_1.default(upload_files_pattern);
@@ -6305,64 +6397,64 @@ function run() {
             const octokit = new action_github.GitHub(github_token);
             /** Can not upload assets by v4 API, so we use v3 API by now **/
             /**
-            // Debug Tool: https://developer.github.com/v4/explorer
-            // API Docs:   https://developer.github.com/v4/
-            const repo_info = await octokit.graphql(`query {
-                    repository (owner:"xresloader", name:"xresloader") {
-                        release (tagName: "v2.5.0") {
-                        id,
-                        name,
-                        isDraft,
-                        resourcePath,
-                        tag {
+                // Debug Tool: https://developer.github.com/v4/explorer
+                // API Docs:   https://developer.github.com/v4/
+                const repo_info = await octokit.graphql(`query {
+                        repository (owner:"xresloader", name:"xresloader") {
+                            release (tagName: "v2.5.0") {
                             id,
                             name,
-                            prefix
-                        },
-                        updatedAt,
-                        url,
-                        releaseAssets(last: 5) {
-                            nodes {
-                            id,
-                            name,
-                            size,
-                            downloadUrl
+                            isDraft,
+                            resourcePath,
+                            tag {
+                                id,
+                                name,
+                                prefix
+                            },
+                            updatedAt,
+                            url,
+                            releaseAssets(last: 5) {
+                                nodes {
+                                id,
+                                name,
+                                size,
+                                downloadUrl
+                                }
+                            }
                             }
                         }
-                        }
-                    }
-                }`);
-    
-            const repo_info_of_release = await octokit.graphql(`query {
-                    repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") {
-                        release (tagName: "${release_name}") {
-                        id,
-                        name,
-                        isDraft,
-                        resourcePath,
-                        tag {
+                    }`);
+        
+                const repo_info_of_release = await octokit.graphql(`query {
+                        repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") {
+                            release (tagName: "${release_name}") {
                             id,
                             name,
-                            prefix
-                        },
-                        updatedAt,
-                        url,
-                        releaseAssets(last: 5) {
-                            nodes {
-                            id,
-                            name,
-                            size,
-                            downloadUrl
+                            isDraft,
+                            resourcePath,
+                            tag {
+                                id,
+                                name,
+                                prefix
+                            },
+                            updatedAt,
+                            url,
+                            releaseAssets(last: 5) {
+                                nodes {
+                                id,
+                                name,
+                                size,
+                                downloadUrl
+                                }
+                            }
                             }
                         }
-                        }
-                    }
-                }`);
-    
-            console.log("============================= v4 API: graphql(query {repository}) =============================");
-            console.log(`repo_info = ${JSON.stringify(repo_info)}`);
-            console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
-            **/
+                    }`);
+        
+                console.log("============================= v4 API: graphql(query {repository}) =============================");
+                console.log(`repo_info = ${JSON.stringify(repo_info)}`);
+                console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
+                **/
             // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
             var deploy_release = undefined;
             if (update_latest_release) {
@@ -6452,7 +6544,9 @@ function run() {
             var upload_url = deploy_release ? deploy_release.data.upload_url : "";
             var release_url = deploy_release ? deploy_release.data.url : "";
             var release_tag_name = deploy_release ? deploy_release.data.tag_name : "";
-            var release_commitish = deploy_release ? deploy_release.data.target_commitish : "";
+            var release_commitish = deploy_release
+                ? deploy_release.data.target_commitish
+                : "";
             var release_id = deploy_release ? deploy_release.data.id : 0;
             // https://developer.github.com/v3/repos/releases/#create-a-release
             if (deploy_release && deploy_release.data) {
@@ -6466,7 +6560,9 @@ function run() {
                         repo: action_github.context.repo.repo,
                         release_id: release_id,
                         tag_name: release_name,
-                        target_commitish: release_name_bind_to_tag ? undefined : action_github.context.sha,
+                        target_commitish: release_name_bind_to_tag
+                            ? undefined
+                            : action_github.context.sha,
                         name: release_name,
                         body: deploy_release.data.body || undefined,
                         draft: is_draft,
@@ -6498,7 +6594,9 @@ function run() {
                         owner: action_github.context.repo.owner,
                         repo: action_github.context.repo.repo,
                         tag_name: release_name,
-                        target_commitish: release_name_bind_to_tag ? undefined : action_github.context.sha,
+                        target_commitish: release_name_bind_to_tag
+                            ? undefined
+                            : action_github.context.sha,
                         name: release_name,
                         // body: "",
                         draft: is_draft,
@@ -6573,13 +6671,15 @@ function run() {
                 console.log("============================= v3 API: uploadReleaseAsset =============================");
             }
             for (const file_path of pending_to_upload) {
+                const file_stats = fs.statSync(file_path);
+                const file_size = (file_stats || {}).size || 0;
                 const file_base_name = path.basename(file_path);
                 const max_retry_times = 3;
                 var failed_error_msg = null;
                 for (var retry_tims = 0; retry_tims <= max_retry_times; ++retry_tims) {
-                    const retry_msg = (0 === retry_tims) ? "" : `(${retry_tims} retry)`;
+                    const retry_msg = 0 === retry_tims ? "" : `(${retry_tims} retry)`;
                     try {
-                        console.log(`Start uploading asset${retry_msg}: ${file_path} ...`);
+                        console.log(`Start uploading asset${retry_msg}: ${file_path}(size: ${file_size}) ...`);
                         // Maybe upload failed before, try to remove old incompleted file
                         // Only graphql API(v4) can get bad assets
                         if (0 !== retry_tims) {
@@ -6612,11 +6712,13 @@ function run() {
                             if (is_verbose) {
                                 console.log(`${retry_msg}v4 API: query = ${JSON.stringify(repo_info_of_release)}`);
                             }
-                            const assets = ((((repo_info_of_release || {}).repository || {})
-                                .release || {}).releaseAssets || {}).nodes || [];
+                            const assets = ((((repo_info_of_release || {}).repository || {}).release || {})
+                                .releaseAssets || {}).nodes || [];
                             for (const asset of assets) {
                                 if (asset.name == file_base_name) {
-                                    const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
+                                    const pick_id = Buffer.from(asset.id, "base64")
+                                        .toString()
+                                        .match(/\d+$/); // convert id from graphql v4 api to v3 rest api
                                     const asset_v3_id = pick_id ? parseInt(pick_id[0]) : 0;
                                     console.log(`Found old asset ${file_base_name}${retry_msg}: deleting id ${asset_v3_id} ...`);
                                     const delete_rsp = yield octokit.repos.deleteReleaseAsset({
@@ -6639,12 +6741,12 @@ function run() {
                             url: upload_url,
                             headers: {
                                 "content-type": find_mime || "application/octet-stream",
-                                "content-length": fs.statSync(file_path).size
+                                "content-length": file_size
                             },
                             name: file_base_name,
                             data: fs.createReadStream(file_path)
                         });
-                        if (200 != (upload_rsp.status - upload_rsp.status % 100)) {
+                        if (200 != upload_rsp.status - (upload_rsp.status % 100)) {
                             const msg = `Upload asset${retry_msg}: ${file_base_name} failed => ${upload_rsp.headers.status}`;
                             console.log(msg);
                             if (failed_error_msg === null) {
@@ -7560,7 +7662,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var isPlainObject = _interopDefault(__webpack_require__(696));
+var isPlainObject = _interopDefault(__webpack_require__(626));
 var universalUserAgent = __webpack_require__(562);
 
 function lowercaseKeys(object) {
@@ -11328,6 +11430,13 @@ exports.setFailed = setFailed;
 // Logging Commands
 //-----------------------------------------------------------------------
 /**
+ * Gets whether Actions Step Debug is on or not
+ */
+function isDebug() {
+    return process.env['RUNNER_DEBUG'] === '1';
+}
+exports.isDebug = isDebug;
+/**
  * Writes debug message to user log
  * @param message debug message
  */
@@ -12884,6 +12993,62 @@ exports.HttpClient = HttpClient;
 
 /***/ }),
 
+/***/ 548:
+/***/ (function(module) {
+
+"use strict";
+
+
+/*!
+ * isobject <https://github.com/jonschlinkert/isobject>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObject(val) {
+  return val != null && typeof val === 'object' && Array.isArray(val) === false;
+}
+
+/*!
+ * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObjectObject(o) {
+  return isObject(o) === true
+    && Object.prototype.toString.call(o) === '[object Object]';
+}
+
+function isPlainObject(o) {
+  var ctor,prot;
+
+  if (isObjectObject(o) === false) return false;
+
+  // If has modified constructor
+  ctor = o.constructor;
+  if (typeof ctor !== 'function') return false;
+
+  // If has modified prototype
+  prot = ctor.prototype;
+  if (isObjectObject(prot) === false) return false;
+
+  // If constructor does not have an Object-specific method
+  if (prot.hasOwnProperty('isPrototypeOf') === false) {
+    return false;
+  }
+
+  // Most likely a plain Object
+  return true;
+}
+
+module.exports = isPlainObject;
+
+
+/***/ }),
+
 /***/ 550:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
@@ -13405,7 +13570,7 @@ const fs = __webpack_require__(747);
 const arrayUnion = __webpack_require__(464);
 const merge2 = __webpack_require__(538);
 const fastGlob = __webpack_require__(406);
-const dirGlob = __webpack_require__(895);
+const dirGlob = __webpack_require__(38);
 const gitignore = __webpack_require__(804);
 const {FilterStream, UniqueStream} = __webpack_require__(162);
 
@@ -13577,6 +13742,62 @@ module.exports.hasMagic = (patterns, options) => []
 	.some(pattern => fastGlob.isDynamicPattern(pattern, options));
 
 module.exports.gitignore = gitignore;
+
+
+/***/ }),
+
+/***/ 626:
+/***/ (function(module) {
+
+"use strict";
+
+
+/*!
+ * isobject <https://github.com/jonschlinkert/isobject>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObject(val) {
+  return val != null && typeof val === 'object' && Array.isArray(val) === false;
+}
+
+/*!
+ * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+function isObjectObject(o) {
+  return isObject(o) === true
+    && Object.prototype.toString.call(o) === '[object Object]';
+}
+
+function isPlainObject(o) {
+  var ctor,prot;
+
+  if (isObjectObject(o) === false) return false;
+
+  // If has modified constructor
+  ctor = o.constructor;
+  if (typeof ctor !== 'function') return false;
+
+  // If has modified prototype
+  prot = ctor.prototype;
+  if (isObjectObject(prot) === false) return false;
+
+  // If constructor does not have an Object-specific method
+  if (prot.hasOwnProperty('isPrototypeOf') === false) {
+    return false;
+  }
+
+  // Most likely a plain Object
+  return true;
+}
+
+module.exports = isPlainObject;
 
 
 /***/ }),
@@ -13975,62 +14196,6 @@ class Deprecation extends Error {
 }
 
 exports.Deprecation = Deprecation;
-
-
-/***/ }),
-
-/***/ 696:
-/***/ (function(module) {
-
-"use strict";
-
-
-/*!
- * isobject <https://github.com/jonschlinkert/isobject>
- *
- * Copyright (c) 2014-2017, Jon Schlinkert.
- * Released under the MIT License.
- */
-
-function isObject(val) {
-  return val != null && typeof val === 'object' && Array.isArray(val) === false;
-}
-
-/*!
- * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
- *
- * Copyright (c) 2014-2017, Jon Schlinkert.
- * Released under the MIT License.
- */
-
-function isObjectObject(o) {
-  return isObject(o) === true
-    && Object.prototype.toString.call(o) === '[object Object]';
-}
-
-function isPlainObject(o) {
-  var ctor,prot;
-
-  if (isObjectObject(o) === false) return false;
-
-  // If has modified constructor
-  ctor = o.constructor;
-  if (typeof ctor !== 'function') return false;
-
-  // If has modified prototype
-  prot = ctor.prototype;
-  if (isObjectObject(prot) === false) return false;
-
-  // If constructor does not have an Object-specific method
-  if (prot.hasOwnProperty('isPrototypeOf') === false) {
-    return false;
-  }
-
-  // Most likely a plain Object
-  return true;
-}
-
-module.exports = isPlainObject;
 
 
 /***/ }),
@@ -14620,7 +14785,7 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 
 var endpoint = __webpack_require__(385);
 var universalUserAgent = __webpack_require__(211);
-var isPlainObject = _interopDefault(__webpack_require__(696));
+var isPlainObject = _interopDefault(__webpack_require__(548));
 var nodeFetch = _interopDefault(__webpack_require__(454));
 var requestError = __webpack_require__(463);
 
@@ -15062,7 +15227,7 @@ module.exports = braces;
 
 
 
-const isNumber = __webpack_require__(914);
+const isNumber = __webpack_require__(895);
 
 const toRegexRange = (min, max, options) => {
   if (isNumber(min) === false) {
@@ -32582,83 +32747,26 @@ module.exports = function isExtglob(str) {
 /***/ }),
 
 /***/ 895:
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ (function(module) {
 
 "use strict";
+/*!
+ * is-number <https://github.com/jonschlinkert/is-number>
+ *
+ * Copyright (c) 2014-present, Jon Schlinkert.
+ * Released under the MIT License.
+ */
 
-const path = __webpack_require__(622);
-const pathType = __webpack_require__(501);
 
-const getExtensions = extensions => extensions.length > 1 ? `{${extensions.join(',')}}` : extensions[0];
 
-const getPath = (filepath, cwd) => {
-	const pth = filepath[0] === '!' ? filepath.slice(1) : filepath;
-	return path.isAbsolute(pth) ? pth : path.join(cwd, pth);
-};
-
-const addExtensions = (file, extensions) => {
-	if (path.extname(file)) {
-		return `**/${file}`;
-	}
-
-	return `**/${file}.${getExtensions(extensions)}`;
-};
-
-const getGlob = (directory, options) => {
-	if (options.files && !Array.isArray(options.files)) {
-		throw new TypeError(`Expected \`files\` to be of type \`Array\` but received type \`${typeof options.files}\``);
-	}
-
-	if (options.extensions && !Array.isArray(options.extensions)) {
-		throw new TypeError(`Expected \`extensions\` to be of type \`Array\` but received type \`${typeof options.extensions}\``);
-	}
-
-	if (options.files && options.extensions) {
-		return options.files.map(x => path.posix.join(directory, addExtensions(x, options.extensions)));
-	}
-
-	if (options.files) {
-		return options.files.map(x => path.posix.join(directory, `**/${x}`));
-	}
-
-	if (options.extensions) {
-		return [path.posix.join(directory, `**/*.${getExtensions(options.extensions)}`)];
-	}
-
-	return [path.posix.join(directory, '**')];
-};
-
-module.exports = async (input, options) => {
-	options = {
-		cwd: process.cwd(),
-		...options
-	};
-
-	if (typeof options.cwd !== 'string') {
-		throw new TypeError(`Expected \`cwd\` to be of type \`string\` but received type \`${typeof options.cwd}\``);
-	}
-
-	const globs = await Promise.all([].concat(input).map(async x => {
-		const isDirectory = await pathType.isDirectory(getPath(x, options.cwd));
-		return isDirectory ? getGlob(x, options) : x;
-	}));
-
-	return [].concat.apply([], globs); // eslint-disable-line prefer-spread
-};
-
-module.exports.sync = (input, options) => {
-	options = {
-		cwd: process.cwd(),
-		...options
-	};
-
-	if (typeof options.cwd !== 'string') {
-		throw new TypeError(`Expected \`cwd\` to be of type \`string\` but received type \`${typeof options.cwd}\``);
-	}
-
-	const globs = [].concat(input).map(x => pathType.isDirectorySync(getPath(x, options.cwd)) ? getGlob(x, options) : x);
-
-	return [].concat.apply([], globs); // eslint-disable-line prefer-spread
+module.exports = function(num) {
+  if (typeof num === 'number') {
+    return num - num === 0;
+  }
+  if (typeof num === 'string' && num.trim() !== '') {
+    return Number.isFinite ? Number.isFinite(+num) : isFinite(+num);
+  }
+  return false;
 };
 
 
@@ -32753,32 +32861,6 @@ function withCustomRequest(customRequest) {
 exports.graphql = graphql$1;
 exports.withCustomRequest = withCustomRequest;
 //# sourceMappingURL=index.js.map
-
-
-/***/ }),
-
-/***/ 914:
-/***/ (function(module) {
-
-"use strict";
-/*!
- * is-number <https://github.com/jonschlinkert/is-number>
- *
- * Copyright (c) 2014-present, Jon Schlinkert.
- * Released under the MIT License.
- */
-
-
-
-module.exports = function(num) {
-  if (typeof num === 'number') {
-    return num - num === 0;
-  }
-  if (typeof num === 'string' && num.trim() !== '') {
-    return Number.isFinite ? Number.isFinite(+num) : isFinite(+num);
-  }
-  return false;
-};
 
 
 /***/ }),

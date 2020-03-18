@@ -126,11 +126,6 @@ The release commitish.
 We can use [npm][3] or [yarn][4] to build this action.
 
 ```bash
-# for npm
-npm install
-npm run build
-
-# for yarn
 npm i -g yarn
 yarn install
 yarn run build
