@@ -218,6 +218,9 @@ async function run() {
       | undefined = undefined;
 
     if (update_latest_release) {
+      console.log(
+        `Try to get latest release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+      );
       try {
         deploy_release = await octokit.repos.getLatestRelease({
           owner: action_github.context.repo.owner,
@@ -231,6 +234,9 @@ async function run() {
     }
 
     if (!(deploy_release && deploy_release.data)) {
+      console.log(
+        `Try to get release by tag ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+      );
       try {
         deploy_release = await octokit.repos.getReleaseByTag({
           owner: action_github.context.repo.owner,
@@ -246,6 +252,9 @@ async function run() {
 
     // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
     if (!(deploy_release && deploy_release.data) && is_draft) {
+      console.log(
+        `Try to get draft release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+      );
       try {
         const rsp = await octokit.repos.listReleases({
           owner: action_github.context.repo.owner,
