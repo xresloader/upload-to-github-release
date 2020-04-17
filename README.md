@@ -67,6 +67,8 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Default** : true
 
+We will only try to query the first 100 releases to find the release with the same name, because we can not get any brelease by tag name util it's published.
+
 ### `prerelease`
 
 **Optional** The resultant deployment is a Prerelease that only repository collaborators can see. This gives you an opportunity to examine and edit the prerelease.
