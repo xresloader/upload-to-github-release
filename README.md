@@ -67,7 +67,7 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Default** : true
 
-We will only try to query the first 100 releases to find the release with the same name, because we can not get any brelease by tag name util it's published.
+We will only try to query the first 100 releases to find the draft release with the same name, because we can not get a draft release by tag name util it's published.
 
 ### `prerelease`
 
