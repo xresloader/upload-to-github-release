@@ -618,6 +618,7 @@ async function run() {
             }
           }
 
+          /*
           function readableToString(readable) {
             return new Promise((resolve, reject) => {
               let data = "";
@@ -632,11 +633,14 @@ async function run() {
               });
             });
           }
+          */
 
           const find_mime = mime.getType(path.extname(file_path));
-          const file_data: any = await readableToString(
+          const file_data: any = fs.readFileSync(
+            file_path
+          ); /*await readableToString(
             fs.createReadStream(file_path)
-          );
+          );*/
           const request_params = {
             owner: action_github.context.repo.owner,
             repo: action_github.context.repo.repo,
@@ -651,9 +655,7 @@ async function run() {
           };
           if (is_verbose) {
             console.log(
-              `${retry_msg}uploadReleaseAsset with length: ${
-                file_data.length
-              }, request: ${JSON.stringify(request_params)}`
+              `${retry_msg}uploadReleaseAsset with length: ${file_data.length}`
             );
           }
           const upload_rsp = await octokit.repos.uploadReleaseAsset(

@@ -5324,22 +5324,26 @@ function run() {
                                 }
                             }
                         }
+                        /*
                         function readableToString(readable) {
-                            return new Promise((resolve, reject) => {
-                                let data = "";
-                                readable.on("data", function (chunk) {
-                                    data += chunk;
-                                });
-                                readable.on("end", function () {
-                                    resolve(data);
-                                });
-                                readable.on("error", function (err) {
-                                    reject(err);
-                                });
+                          return new Promise((resolve, reject) => {
+                            let data = "";
+                            readable.on("data", function (chunk) {
+                              data += chunk;
                             });
+                            readable.on("end", function () {
+                              resolve(data);
+                            });
+                            readable.on("error", function (err) {
+                              reject(err);
+                            });
+                          });
                         }
+                        */
                         const find_mime = lite_1.default.getType(path.extname(file_path));
-                        const file_data = yield readableToString(fs.createReadStream(file_path));
+                        const file_data = fs.readFileSync(file_path); /*await readableToString(
+                          fs.createReadStream(file_path)
+                        );*/
                         const request_params = {
                             owner: action_github.context.repo.owner,
                             repo: action_github.context.repo.repo,
@@ -5352,7 +5356,7 @@ function run() {
                             data: file_data,
                         };
                         if (is_verbose) {
-                            console.log(`${retry_msg}uploadReleaseAsset with length: ${file_data.length}, request: ${JSON.stringify(request_params)}`);
+                            console.log(`${retry_msg}uploadReleaseAsset with length: ${file_data.length}`);
                         }
                         const upload_rsp = yield octokit.repos.uploadReleaseAsset(request_params);
                         if (200 != upload_rsp.status - (upload_rsp.status % 100)) {
