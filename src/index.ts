@@ -617,9 +617,27 @@ async function run() {
               }
             }
           }
+
+          function readableToString(readable) {
+            return new Promise((resolve, reject) => {
+              let data = "";
+              readable.on("data", function (chunk) {
+                data += chunk;
+              });
+              readable.on("end", function () {
+                resolve(data);
+              });
+              readable.on("error", function (err) {
+                reject(err);
+              });
+            });
+          }
+
           const find_mime = mime.getType(path.extname(file_path));
-          const file_data = fs.createReadStream(file_path).read();
-          const upload_rsp = await octokit.repos.uploadReleaseAsset({
+          const file_data: any = await readableToString(
+            fs.createReadStream(file_path)
+          );
+          const request_params = {
             owner: action_github.context.repo.owner,
             repo: action_github.context.repo.repo,
             release_id: release_id,
@@ -630,7 +648,17 @@ async function run() {
             },
             name: file_base_name,
             data: file_data,
-          });
+          };
+          if (is_verbose) {
+            console.log(
+              `${retry_msg}uploadReleaseAsset with length: ${
+                file_data.length
+              }, request: ${JSON.stringify(request_params)}`
+            );
+          }
+          const upload_rsp = await octokit.repos.uploadReleaseAsset(
+            request_params
+          );
 
           if (200 != upload_rsp.status - (upload_rsp.status % 100)) {
             const msg = `Upload asset${retry_msg}: ${file_base_name} failed => ${upload_rsp.headers.status}`;
