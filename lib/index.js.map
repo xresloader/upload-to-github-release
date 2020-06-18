@@ -5333,7 +5333,6 @@ function run() {
                             url: upload_url,
                             headers: {
                                 "content-type": find_mime || "application/octet-stream",
-                                "content-length": file_size,
                             },
                             name: file_base_name,
                             data: file_data,
