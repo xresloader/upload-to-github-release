@@ -4,7 +4,8 @@ import globby from "globby";
 import * as path from "path";
 import * as fs from "fs";
 import mime from "mime/lite";
-import Octokit from "@octokit/rest";
+// import Octokit from "@octokit/rest";
+import { AsyncReturnType, ValueOf } from "type-fest";
 
 // const io = require('@actions/io');
 // const tc = require('@actions/tool-cache');
@@ -131,7 +132,8 @@ async function run() {
     }
 
     // request github release
-    const octokit = new action_github.GitHub(github_token);
+    const octokit = action_github.getOctokit(github_token);
+    // const octokit = new action_github.GitHub(github_token);
     /** Can not upload assets by v4 API, so we use v3 API by now **/
     /**
         // Debug Tool: https://developer.github.com/v4/explorer
@@ -193,28 +195,21 @@ async function run() {
         console.log(`repo_info_of_release = ${JSON.stringify(repo_info_of_release)}`);
         **/
     // https://developer.github.com/v3/repos/releases/#upload-a-release-asset
+    type FakeListReleaseReponse = AsyncReturnType<
+      typeof octokit.repos.listReleases
+    >;
     var deploy_release:
+      | AsyncReturnType<typeof octokit.repos.getReleaseByTag>
+      | AsyncReturnType<typeof octokit.repos.updateRelease>
+      | AsyncReturnType<typeof octokit.repos.getLatestRelease>
       | {
-          data:
-            | Octokit.Octokit.ReposListReleasesResponseItem
-            | Octokit.Octokit.ReposGetReleaseByTagResponse
-            | Octokit.Octokit.ReposGetLatestReleaseResponse
-            | Octokit.Octokit.ReposCreateReleaseResponse
-            | Octokit.Octokit.ReposUpdateReleaseResponse;
-          status: number;
-          headers: {
-            date: string;
-            "x-ratelimit-limit": string;
-            "x-ratelimit-remaining": string;
-            "x-ratelimit-reset": string;
-            "x-Octokit-request-id": string;
-            "x-Octokit-media-type": string;
-            link: string;
-            "last-modified": string;
-            etag: string;
-            status: string;
-          };
+          data: ValueOf<ValueOf<FakeListReleaseReponse, "data">, 0>;
+          status: ValueOf<FakeListReleaseReponse, "status">;
+          headers: ValueOf<FakeListReleaseReponse, "headers">;
         }
+      | undefined = undefined;
+    var created_release:
+      | AsyncReturnType<typeof octokit.repos.createRelease>
       | undefined = undefined;
 
     if (update_latest_release) {
@@ -299,6 +294,9 @@ async function run() {
       }
     }
 
+    /**
+    // action_github.context.sha will be the tag's commit, it's usual 1 commit above where the tag create from
+    // This will always cause update tag's commit, which is not  what we expect, so we disable to check and update tag here
     // Check tag references
     var git_tag_ref:
       | Octokit.Octokit.Response<Octokit.Octokit.GitGetRefResponse>
@@ -318,7 +316,7 @@ async function run() {
         ref: `tags/${release_name}`,
       });
       console.log(
-        `Get git tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`
+        `Get git tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success: ${git_tag_ref.data.object.sha}`
       );
       if (is_verbose) {
         console.log(`getRef.data = ${JSON.stringify(git_tag_ref.data)}`);
@@ -341,7 +339,7 @@ async function run() {
             );
           }
           console.log(
-            `Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+            `Try to update git refs/tags/${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} to ${action_github.context.sha}`
           );
           const res = await octokit.git.updateRef({
             owner: action_github.context.repo.owner,
@@ -363,8 +361,29 @@ async function run() {
         }
       }
     }
+    **/
 
-    const pending_to_delete: any[] = [];
+    type AssertArrayType =
+      | ValueOf<ValueOf<ValueOf<FakeListReleaseReponse, "data">, 0>, "assets">
+      | ValueOf<
+          ValueOf<
+            AsyncReturnType<typeof octokit.repos.getReleaseByTag>,
+            "data"
+          >,
+          "assets"
+        >
+      | ValueOf<
+          ValueOf<AsyncReturnType<typeof octokit.repos.updateRelease>, "data">,
+          "assets"
+        >
+      | ValueOf<
+          ValueOf<
+            AsyncReturnType<typeof octokit.repos.getLatestRelease>,
+            "data"
+          >,
+          "assets"
+        >;
+    const pending_to_delete: AssertArrayType = [];
     const pending_to_upload: string[] = [];
     var upload_url = deploy_release ? deploy_release.data.upload_url : "";
     var release_url = deploy_release ? deploy_release.data.url : "";
@@ -389,9 +408,7 @@ async function run() {
           repo: action_github.context.repo.repo,
           release_id: release_id,
           tag_name: release_name,
-          target_commitish: release_name_bind_to_tag
-            ? undefined
-            : action_github.context.sha,
+          target_commitish: action_github.context.sha,
           name: release_name,
           body: deploy_release.data.body || undefined,
           draft: is_draft,
@@ -425,29 +442,27 @@ async function run() {
         console.log(
           `Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
         );
-        deploy_release = await octokit.repos.createRelease({
+        created_release = await octokit.repos.createRelease({
           owner: action_github.context.repo.owner,
           repo: action_github.context.repo.repo,
           tag_name: release_name,
-          target_commitish: release_name_bind_to_tag
-            ? undefined
-            : action_github.context.sha,
+          target_commitish: action_github.context.sha,
           name: release_name,
           // body: "",
           draft: is_draft,
           prerelease: is_prerelease,
         });
-        upload_url = deploy_release.data.upload_url;
-        release_url = deploy_release.data.url;
-        release_tag_name = deploy_release.data.tag_name;
-        release_commitish = deploy_release.data.target_commitish;
-        release_id = deploy_release.data.id;
+        upload_url = created_release.data.upload_url;
+        release_url = created_release.data.url;
+        release_tag_name = created_release.data.tag_name;
+        release_commitish = created_release.data.target_commitish;
+        release_id = created_release.data.id;
         console.log(
           `Create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`
         );
         if (is_verbose) {
           console.log(
-            `createRelease.data = ${JSON.stringify(deploy_release.data)}`
+            `createRelease.data = ${JSON.stringify(created_release.data)}`
           );
         }
       } catch (error) {
@@ -459,10 +474,12 @@ async function run() {
     }
 
     // Collect assets to upload
-    if (deploy_release && deploy_release.data && deploy_release.data.assets) {
+    {
       const old_asset_map = {};
-      for (const asset of deploy_release.data.assets || []) {
-        old_asset_map[asset.name] = asset;
+      if (deploy_release && deploy_release.data && deploy_release.data.assets) {
+        for (const asset of deploy_release.data.assets) {
+          old_asset_map[asset.name] = asset;
+        }
       }
 
       for (const file_path of upload_files) {
@@ -473,7 +490,7 @@ async function run() {
             pending_to_upload.push(file_path);
           } else {
             console.log(
-              `Skip asset file: ${file_base_name}, it'salready existed.`
+              `Skip asset file: ${file_base_name}, it's already existed.`
             );
           }
         } else {
@@ -534,7 +551,7 @@ async function run() {
             console.log(
               `============================= v4 API: query { repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") } =============================`
             );
-            const repo_info_of_release = await octokit.graphql(`query {
+            const repo_info_of_release: any = await octokit.graphql(`query {
                             repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") { 
                                 release (tagName: "${release_tag_name}") {
                                 id,
@@ -601,14 +618,18 @@ async function run() {
             }
           }
           const find_mime = mime.getType(path.extname(file_path));
+          const file_data = fs.createReadStream(file_path).read();
           const upload_rsp = await octokit.repos.uploadReleaseAsset({
+            owner: action_github.context.repo.owner,
+            repo: action_github.context.repo.repo,
+            release_id: release_id,
             url: upload_url,
             headers: {
-              "content-type": find_mime || "application/octet-stream",
-              "content-length": file_size,
+              "Content-Type": find_mime || "application/octet-stream",
+              "Content-Length": file_size,
             },
             name: file_base_name,
-            data: fs.createReadStream(file_path),
+            data: file_data,
           });
 
           if (200 != upload_rsp.status - (upload_rsp.status % 100)) {
