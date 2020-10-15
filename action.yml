@@ -6,6 +6,10 @@ inputs:
     description: "The files or file patterns to upload. You can upload multiple files by split them by semicolon. You can use the glob pattern to find the files."
     required: true
     default: ""
+  delete_file:
+    description: "The files or file patterns to delete before uploading new files. You can delete multiple files by split them by semicolon. You can use the glob pattern to find the files."
+    required: false
+    default: ""
   overwrite:
     description: "If you need to overwrite existing files, add overwrite: true to the with."
     required: false

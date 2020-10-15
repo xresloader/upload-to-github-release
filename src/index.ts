@@ -1,6 +1,7 @@
 import * as action_core from "@actions/core";
 import * as action_github from "@actions/github";
 import globby from "globby";
+import micromatch from 'micromatch';
 import * as path from "path";
 import * as fs from "fs";
 import mime from "mime/lite";
@@ -36,6 +37,7 @@ async function run() {
   try {
     const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
     const upload_files_pattern = getInputAsArray("file");
+    const delete_files_pattern = getInputAsArray("delete_file");
     const is_overwrite = action_core.getInput("overwrite");
     const is_draft = getInputAsBool("draft");
     const is_prerelease = getInputAsBool("prerelease");
@@ -476,16 +478,23 @@ async function run() {
     // Collect assets to upload
     {
       const old_asset_map = {};
+      const in_delete_rule = {};
       if (deploy_release && deploy_release.data && deploy_release.data.assets) {
         for (const asset of deploy_release.data.assets) {
           old_asset_map[asset.name] = asset;
+          if (delete_files_pattern && micromatch.isMatch(asset.name, delete_files_pattern)) {
+            in_delete_rule[asset.name] = true;
+            pending_to_delete.push(asset);
+          }
         }
       }
 
       for (const file_path of upload_files) {
         const file_base_name = path.basename(file_path);
         if (old_asset_map[file_base_name]) {
-          if (is_overwrite) {
+          if (in_delete_rule[file_base_name]) {
+            // Already in delete rule, do nothing.
+          } else if (is_overwrite) {
             pending_to_delete.push(old_asset_map[file_base_name]);
             pending_to_upload.push(file_path);
           } else {

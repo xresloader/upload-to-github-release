@@ -55,6 +55,10 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Required** The files or file patterns to upload. You can upload multiple files by split them by semicolon. You can use the glob pattern to find the files.
 
+### `delete_file`
+
+**Required** The files or file patterns to delete before uploading new files. You can delete multiple files by split them by semicolon. You can use the glob pattern to find the files.
+
 ### `overwrite`
 
 **Optional** If you need to overwrite existing files, add overwrite: true.
