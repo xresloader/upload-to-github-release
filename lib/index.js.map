@@ -2984,6 +2984,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getInputAsBool = exports.getInputAsArray = void 0;
 const action_core = __importStar(__webpack_require__(470));
 const action_github = __importStar(__webpack_require__(469));
 const globby_1 = __importDefault(__webpack_require__(625));
@@ -2999,6 +3000,7 @@ function getInputAsArray(name) {
         .map((v) => v.trim())
         .filter((v) => !!v);
 }
+exports.getInputAsArray = getInputAsArray;
 function getInputAsBool(name) {
     const res = (action_core.getInput(name) || "").toLowerCase();
     if (!res) {
@@ -3010,6 +3012,7 @@ function getInputAsBool(name) {
         res != "no" &&
         res != "disable");
 }
+exports.getInputAsBool = getInputAsBool;
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -3241,12 +3244,18 @@ function run() {
             {
                 const old_asset_map = {};
                 const in_delete_rule = {};
+                if (is_verbose) {
+                    console.log(`Delete file pattern: ${delete_files_pattern}`);
+                }
                 if (deploy_release && deploy_release.data && deploy_release.data.assets) {
                     for (const asset of deploy_release.data.assets) {
                         old_asset_map[asset.name] = asset;
-                        if (delete_files_pattern && micromatch_1.default.isMatch('foo', delete_files_pattern)) {
+                        if (delete_files_pattern && micromatch_1.default.isMatch(asset.name, delete_files_pattern)) {
                             in_delete_rule[asset.name] = true;
                             pending_to_delete.push(asset);
+                            if (is_verbose) {
+                                console.log(`Old asset file: ${asset.name} match ${delete_files_pattern}.`);
+                            }
                         }
                     }
                 }
@@ -3255,10 +3264,14 @@ function run() {
                     if (old_asset_map[file_base_name]) {
                         if (in_delete_rule[file_base_name]) {
                             // Already in delete rule, do nothing.
+                            console.log(`Overwrite asset file: ${file_base_name} , because it match ${delete_files_pattern}.`);
                         }
                         else if (is_overwrite) {
                             pending_to_delete.push(old_asset_map[file_base_name]);
                             pending_to_upload.push(file_path);
+                            if (is_verbose) {
+                                console.log(`Overwrite old asset file: ${file_base_name}.`);
+                            }
                         }
                         else {
                             console.log(`Skip asset file: ${file_base_name}, it's already existed.`);
