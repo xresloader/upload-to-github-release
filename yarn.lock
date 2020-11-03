@@ -3505,6 +3505,11 @@ stealthy-require@^1.1.1:
   resolved "http://mirrors.cloud.tencent.com/npm/stealthy-require/-/stealthy-require-1.1.1.tgz#35b09875b4ff49f26a777e509b3090a3226bf24b"
   integrity sha1-NbCYdbT/SfJqd35QmzCQoyJr8ks=
 
+string-env-interpolation@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.npm.taobao.org/string-env-interpolation/download/string-env-interpolation-1.0.1.tgz#ad4397ae4ac53fe6c91d1402ad6f6a52862c7152"
+  integrity sha1-rUOXrkrFP+bJHRQCrW9qUoYscVI=
+
 string-length@^4.0.1:
   version "4.0.1"
   resolved "http://mirrors.cloud.tencent.com/npm/string-length/-/string-length-4.0.1.tgz#4a973bf31ef77c4edbceadd6af2611996985f8a1"
