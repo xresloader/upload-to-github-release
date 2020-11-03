@@ -34,20 +34,24 @@ function getInputAsBool(name: string): boolean {
   );
 }
 
-export { getInputAsArray, getInputAsBool };
+function getInputAsString(name: string): string {
+  return env(action_core.getInput(name) || "").trim();
+}
+
+export { getInputAsArray, getInputAsBool, getInputAsString };
 
 async function run() {
   try {
     const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
     const upload_files_pattern = getInputAsArray("file");
     const delete_files_pattern = getInputAsArray("delete_file");
-    const is_overwrite = action_core.getInput("overwrite");
+    const is_overwrite = getInputAsBool("overwrite");
     const is_draft = getInputAsBool("draft");
     const is_prerelease = getInputAsBool("prerelease");
     const with_tags = getInputAsBool("tags");
     const with_branches = getInputAsArray("branches");
     const is_verbose = getInputAsBool("verbose");
-    const custom_tag_name = (action_core.getInput("tag_name") || "").trim();
+    const custom_tag_name = getInputAsString("tag_name");
     const update_latest_release = getInputAsBool("update_latest_release");
 
     if (typeof github_token != "string") {
