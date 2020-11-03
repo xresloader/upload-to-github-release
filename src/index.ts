@@ -6,20 +6,21 @@ import * as path from "path";
 import * as fs from "fs";
 import mime from "mime/lite";
 // import Octokit from "@octokit/rest";
+import { env } from "string-env-interpolation";
 import { AsyncReturnType, ValueOf } from "type-fest";
 
 // const io = require('@actions/io');
 // const tc = require('@actions/tool-cache');
 
 function getInputAsArray(name: string): string[] {
-  return (action_core.getInput(name) || "")
+  return env(action_core.getInput(name) || "")
     .split(";")
     .map((v) => v.trim())
     .filter((v) => !!v);
 }
 
 function getInputAsBool(name: string): boolean {
-  const res = (action_core.getInput(name) || "").toLowerCase();
+  const res = env(action_core.getInput(name) || "").toLowerCase();
   if (!res) {
     return false;
   }
