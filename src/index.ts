@@ -255,7 +255,7 @@ async function run() {
     }
 
     // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
-    if (!(deploy_release && deploy_release.data) && is_draft) {
+    if (!(deploy_release && deploy_release.data) && release_name_bind_to_tag) {
       console.log(
         `Try to get draft release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
       );

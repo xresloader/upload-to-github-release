@@ -34,15 +34,16 @@
     "micromatch": "^4.0.2",
     "mime": "^2.4.6",
     "string-env-interpolation": "^1.0.1",
-    "type-fest": "^0.18.0"
+    "type-fest": "^0.19.0"
   },
   "devDependencies": {
     "@types/jest": "^26.0.15",
-    "@types/node": "^14.14.6",
+    "@types/node": "^14.14.9",
     "@zeit/ncc": "^0.22.3",
-    "jest": "^26.6.2",
-    "jest-circus": "^26.6.2",
-    "ts-jest": "^26.4.3",
-    "typescript": "^4.0.5"
+    "jest": "^26.6.3",
+    "jest-circus": "^26.6.3",
+    "ts-jest": "^26.4.4",
+    "typescript": "^4.1.2",
+    "npm-check-updates": "^10.2.2"
   }
 }
