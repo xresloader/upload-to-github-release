@@ -487,7 +487,7 @@ async function run() {
       const old_asset_map = {};
       const in_delete_rule = {};
 
-      if (is_verbose) {
+      if (is_verbose && delete_files_pattern) {
         console.log(
           `Delete file pattern: ${delete_files_pattern}`
         );
