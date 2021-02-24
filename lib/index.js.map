@@ -3400,7 +3400,7 @@ function Mime() {
   this._types = Object.create(null);
   this._extensions = Object.create(null);
 
-  for (var i = 0; i < arguments.length; i++) {
+  for (let i = 0; i < arguments.length; i++) {
     this.define(arguments[i]);
   }
 
@@ -3429,16 +3429,18 @@ function Mime() {
  * @param force (Boolean) if true, force overriding of existing definitions
  */
 Mime.prototype.define = function(typeMap, force) {
-  for (var type in typeMap) {
-    var extensions = typeMap[type].map(function(t) {return t.toLowerCase()});
+  for (let type in typeMap) {
+    let extensions = typeMap[type].map(function(t) {
+      return t.toLowerCase();
+    });
     type = type.toLowerCase();
 
-    for (var i = 0; i < extensions.length; i++) {
-      var ext = extensions[i];
+    for (let i = 0; i < extensions.length; i++) {
+      const ext = extensions[i];
 
       // '*' prefix = not the preferred type for this extension.  So fixup the
       // extension, and skip it.
-      if (ext[0] == '*') {
+      if (ext[0] === '*') {
         continue;
       }
 
@@ -3456,8 +3458,8 @@ Mime.prototype.define = function(typeMap, force) {
 
     // Use first extension as default
     if (force || !this._extensions[type]) {
-      var ext = extensions[0];
-      this._extensions[type] = (ext[0] != '*') ? ext : ext.substr(1)
+      const ext = extensions[0];
+      this._extensions[type] = (ext[0] !== '*') ? ext : ext.substr(1);
     }
   }
 };
@@ -3467,11 +3469,11 @@ Mime.prototype.define = function(typeMap, force) {
  */
 Mime.prototype.getType = function(path) {
   path = String(path);
-  var last = path.replace(/^.*[/\\]/, '').toLowerCase();
-  var ext = last.replace(/^.*\./, '').toLowerCase();
+  let last = path.replace(/^.*[/\\]/, '').toLowerCase();
+  let ext = last.replace(/^.*\./, '').toLowerCase();
 
-  var hasPath = last.length < path.length;
-  var hasDot = ext.length < last.length - 1;
+  let hasPath = last.length < path.length;
+  let hasDot = ext.length < last.length - 1;
 
   return (hasDot || !hasPath) && this._types[ext] || null;
 };
@@ -4711,6 +4713,18 @@ function getInputAsString(name) {
     return string_env_interpolation_1.env(action_core.getInput(name) || "").trim();
 }
 exports.getInputAsString = getInputAsString;
+function getInputAsInteger(name) {
+    try {
+        const str_val = getInputAsString(name);
+        if (!str_val) {
+            return 0;
+        }
+        return Number.parseInt(str_val);
+    }
+    catch (_) {
+        return 0;
+    }
+}
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -4725,6 +4739,7 @@ function run() {
             const is_verbose = getInputAsBool("verbose");
             const custom_tag_name = getInputAsString("tag_name");
             const update_latest_release = getInputAsBool("update_latest_release");
+            var release_id = getInputAsInteger("release_id");
             if (typeof github_token != "string") {
                 action_core.setFailed("token is invalid");
                 return;
@@ -4741,11 +4756,12 @@ function run() {
             // action_github.context.actor = owt5008137
             // action_github.context.repo.repo = upload-to-github-release-test
             // action_github.context.repo.owner = xresloader
-            var release_name = "Release-" + action_github.context.sha.substr(0, 8);
-            var release_name_bind_to_tag = false;
+            var release_tag_name = "Release-" + action_github.context.sha.substr(0, 8);
+            var release_name = release_tag_name;
+            var release_tag_name_has_ref = false;
             if (custom_tag_name) {
-                release_name = custom_tag_name;
-                release_name_bind_to_tag = true;
+                release_tag_name = custom_tag_name;
+                release_tag_name_has_ref = true;
             }
             else if ((with_branches && with_branches.length > 0) || with_tags) {
                 // check branches or tags
@@ -4754,8 +4770,8 @@ function run() {
                     const match_tag = action_github.context.ref.match(/refs\/tags\/(.*)/);
                     if (match_tag) {
                         match_filter = true;
-                        release_name_bind_to_tag = true;
-                        release_name = match_tag[1];
+                        release_tag_name_has_ref = true;
+                        release_tag_name = match_tag[1];
                         console.log(`Found tag to push: ${match_tag[1]}.`);
                     }
                     else {
@@ -4768,7 +4784,7 @@ function run() {
                         const selected_branch = with_branches.filter((s) => s == match_branch[1]);
                         if (selected_branch && selected_branch.length > 0) {
                             match_filter = true;
-                            release_name =
+                            release_tag_name =
                                 match_branch[1] + "-" + action_github.context.sha.substr(0, 8);
                             console.log("Found branch push: ${match_tag[1]}.");
                         }
@@ -4786,7 +4802,7 @@ function run() {
                 // try get branch name
                 const match_branch = action_github.context.ref.match(/([^\/]+)$/);
                 if (match_branch && match_branch.length > 1) {
-                    release_name =
+                    release_tag_name =
                         match_branch[1] + "-" + action_github.context.sha.substr(0, 8);
                 }
             }
@@ -4803,7 +4819,7 @@ function run() {
             var deploy_release = undefined;
             var created_release = undefined;
             if (update_latest_release) {
-                console.log(`Try to get latest release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                console.log(`Try to get latest release from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
                 try {
                     deploy_release = yield octokit.repos.getLatestRelease({
                         owner: action_github.context.repo.owner,
@@ -4814,22 +4830,38 @@ function run() {
                     console.log(`Try to get latest release from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
                 }
             }
+            if (release_id != 0 && !(deploy_release && deploy_release.data)) {
+                console.log(`Try to get release by id ${release_id} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                try {
+                    deploy_release = yield octokit.repos.getRelease({
+                        owner: action_github.context.repo.owner,
+                        repo: action_github.context.repo.repo,
+                        release_id: release_id,
+                    });
+                }
+                catch (error) {
+                    const message = `Try to get release by id ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`;
+                    console.error(message);
+                    action_core.setFailed(message);
+                    return;
+                }
+            }
             if (!(deploy_release && deploy_release.data)) {
-                console.log(`Try to get release by tag ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+                console.log(`Try to get release by tag ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
                 try {
                     deploy_release = yield octokit.repos.getReleaseByTag({
                         owner: action_github.context.repo.owner,
                         repo: action_github.context.repo.repo,
-                        tag: release_name,
+                        tag: release_tag_name,
                     });
                 }
                 catch (error) {
-                    console.log(`Try to get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+                    console.log(`Try to get release by tag ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
                 }
             }
             // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
-            if (!(deploy_release && deploy_release.data) && release_name_bind_to_tag) {
-                console.log(`Try to get draft release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            if (!(deploy_release && deploy_release.data) && release_tag_name_has_ref) {
+                console.log(`Try to get draft release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
                 try {
                     const rsp = yield octokit.repos.listReleases({
                         owner: action_github.context.repo.owner,
@@ -4838,8 +4870,8 @@ function run() {
                         per_page: 100,
                     });
                     for (const release of rsp.data || []) {
-                        if (release.name == release_name ||
-                            release.tag_name == release_name) {
+                        if (release.name == release_tag_name ||
+                            release.tag_name == release_tag_name) {
                             deploy_release = {
                                 data: release,
                                 status: rsp.status,
@@ -4850,27 +4882,33 @@ function run() {
                     }
                 }
                 catch (error) {
-                    console.log(`Try to get draft release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+                    console.log(`Try to get draft release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
                 }
             }
             if (is_verbose) {
                 console.log("============================= v3 API: getReleaseByTag =============================");
             }
             if (deploy_release && deploy_release.headers) {
-                console.log(`Get release ${release_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status}`);
+                console.log(`Get release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status}`);
                 if (is_verbose) {
                     console.log(`getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`);
                 }
             }
             const pending_to_delete = [];
             const pending_to_upload = [];
-            var upload_url = deploy_release ? deploy_release.data.upload_url : "";
-            var release_url = deploy_release ? deploy_release.data.url : "";
-            var release_tag_name = deploy_release ? deploy_release.data.tag_name : "";
-            var release_commitish = deploy_release
-                ? deploy_release.data.target_commitish
-                : "";
-            var release_id = deploy_release ? deploy_release.data.id : 0;
+            var upload_url = "";
+            var release_url = "";
+            var release_commitish = "";
+            if (deploy_release && deploy_release.data) {
+                upload_url = deploy_release.data.upload_url;
+                release_url = deploy_release.data.url;
+                release_commitish = deploy_release.data.target_commitish;
+                release_name = deploy_release.data.name;
+                release_id = deploy_release.data.id;
+            }
+            else {
+                release_name = release_tag_name;
+            }
             // https://developer.github.com/v3/repos/releases/#create-a-release
             if (deploy_release && deploy_release.data) {
                 try {
@@ -4882,13 +4920,15 @@ function run() {
                         owner: action_github.context.repo.owner,
                         repo: action_github.context.repo.repo,
                         release_id: release_id,
-                        tag_name: release_name,
+                        tag_name: release_tag_name,
                         target_commitish: action_github.context.sha,
                         name: release_name,
                         body: deploy_release.data.body || undefined,
                         draft: is_draft,
                         prerelease: is_prerelease,
                     });
+                    release_id = deploy_release.data.id;
+                    release_name = deploy_release.data.name;
                     upload_url = deploy_release.data.upload_url;
                     release_url = deploy_release.data.url;
                     release_tag_name = deploy_release.data.tag_name;
@@ -4926,6 +4966,7 @@ function run() {
                     release_tag_name = created_release.data.tag_name;
                     release_commitish = created_release.data.target_commitish;
                     release_id = created_release.data.id;
+                    release_name = created_release.data.name;
                     console.log(`Create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
                     if (is_verbose) {
                         console.log(`createRelease.data = ${JSON.stringify(created_release.data)}`);
@@ -4942,7 +4983,7 @@ function run() {
             {
                 const old_asset_map = {};
                 const in_delete_rule = {};
-                if (is_verbose) {
+                if (is_verbose && delete_files_pattern) {
                     console.log(`Delete file pattern: ${delete_files_pattern}`);
                 }
                 if (deploy_release && deploy_release.data && deploy_release.data.assets) {
@@ -5102,6 +5143,7 @@ function run() {
                             url: upload_url,
                             headers: {
                                 "content-type": find_mime || "application/octet-stream",
+                                // "content-length": file_data.length, // file_size,
                             },
                             name: file_base_name,
                             data: file_data,
@@ -5152,6 +5194,7 @@ function run() {
             // GITHUB_WORKFLOW=main
             // GITHUB_WORKSPACE=/home/runner/work/upload-to-github-release-test/upload-to-github-release-test
             // set output
+            action_core.setOutput("release_id", release_id);
             action_core.setOutput("release_name", release_name);
             action_core.setOutput("release_url", release_url);
             action_core.setOutput("release_tag_name", release_tag_name);
@@ -9240,7 +9283,7 @@ exports.FetchError = FetchError;
 /***/ 460:
 /***/ (function(module) {
 
-module.exports = {"application/andrew-inset":["ez"],"application/applixware":["aw"],"application/atom+xml":["atom"],"application/atomcat+xml":["atomcat"],"application/atomdeleted+xml":["atomdeleted"],"application/atomsvc+xml":["atomsvc"],"application/atsc-dwd+xml":["dwd"],"application/atsc-held+xml":["held"],"application/atsc-rsat+xml":["rsat"],"application/bdoc":["bdoc"],"application/calendar+xml":["xcs"],"application/ccxml+xml":["ccxml"],"application/cdfx+xml":["cdfx"],"application/cdmi-capability":["cdmia"],"application/cdmi-container":["cdmic"],"application/cdmi-domain":["cdmid"],"application/cdmi-object":["cdmio"],"application/cdmi-queue":["cdmiq"],"application/cu-seeme":["cu"],"application/dash+xml":["mpd"],"application/davmount+xml":["davmount"],"application/docbook+xml":["dbk"],"application/dssc+der":["dssc"],"application/dssc+xml":["xdssc"],"application/ecmascript":["ecma","es"],"application/emma+xml":["emma"],"application/emotionml+xml":["emotionml"],"application/epub+zip":["epub"],"application/exi":["exi"],"application/fdt+xml":["fdt"],"application/font-tdpfr":["pfr"],"application/geo+json":["geojson"],"application/gml+xml":["gml"],"application/gpx+xml":["gpx"],"application/gxf":["gxf"],"application/gzip":["gz"],"application/hjson":["hjson"],"application/hyperstudio":["stk"],"application/inkml+xml":["ink","inkml"],"application/ipfix":["ipfix"],"application/its+xml":["its"],"application/java-archive":["jar","war","ear"],"application/java-serialized-object":["ser"],"application/java-vm":["class"],"application/javascript":["js","mjs"],"application/json":["json","map"],"application/json5":["json5"],"application/jsonml+json":["jsonml"],"application/ld+json":["jsonld"],"application/lgr+xml":["lgr"],"application/lost+xml":["lostxml"],"application/mac-binhex40":["hqx"],"application/mac-compactpro":["cpt"],"application/mads+xml":["mads"],"application/manifest+json":["webmanifest"],"application/marc":["mrc"],"application/marcxml+xml":["mrcx"],"application/mathematica":["ma","nb","mb"],"application/mathml+xml":["mathml"],"application/mbox":["mbox"],"application/mediaservercontrol+xml":["mscml"],"application/metalink+xml":["metalink"],"application/metalink4+xml":["meta4"],"application/mets+xml":["mets"],"application/mmt-aei+xml":["maei"],"application/mmt-usd+xml":["musd"],"application/mods+xml":["mods"],"application/mp21":["m21","mp21"],"application/mp4":["mp4s","m4p"],"application/mrb-consumer+xml":["*xdf"],"application/mrb-publish+xml":["*xdf"],"application/msword":["doc","dot"],"application/mxf":["mxf"],"application/n-quads":["nq"],"application/n-triples":["nt"],"application/node":["cjs"],"application/octet-stream":["bin","dms","lrf","mar","so","dist","distz","pkg","bpk","dump","elc","deploy","exe","dll","deb","dmg","iso","img","msi","msp","msm","buffer"],"application/oda":["oda"],"application/oebps-package+xml":["opf"],"application/ogg":["ogx"],"application/omdoc+xml":["omdoc"],"application/onenote":["onetoc","onetoc2","onetmp","onepkg"],"application/oxps":["oxps"],"application/p2p-overlay+xml":["relo"],"application/patch-ops-error+xml":["*xer"],"application/pdf":["pdf"],"application/pgp-encrypted":["pgp"],"application/pgp-signature":["asc","sig"],"application/pics-rules":["prf"],"application/pkcs10":["p10"],"application/pkcs7-mime":["p7m","p7c"],"application/pkcs7-signature":["p7s"],"application/pkcs8":["p8"],"application/pkix-attr-cert":["ac"],"application/pkix-cert":["cer"],"application/pkix-crl":["crl"],"application/pkix-pkipath":["pkipath"],"application/pkixcmp":["pki"],"application/pls+xml":["pls"],"application/postscript":["ai","eps","ps"],"application/provenance+xml":["provx"],"application/pskc+xml":["pskcxml"],"application/raml+yaml":["raml"],"application/rdf+xml":["rdf","owl"],"application/reginfo+xml":["rif"],"application/relax-ng-compact-syntax":["rnc"],"application/resource-lists+xml":["rl"],"application/resource-lists-diff+xml":["rld"],"application/rls-services+xml":["rs"],"application/route-apd+xml":["rapd"],"application/route-s-tsid+xml":["sls"],"application/route-usd+xml":["rusd"],"application/rpki-ghostbusters":["gbr"],"application/rpki-manifest":["mft"],"application/rpki-roa":["roa"],"application/rsd+xml":["rsd"],"application/rss+xml":["rss"],"application/rtf":["rtf"],"application/sbml+xml":["sbml"],"application/scvp-cv-request":["scq"],"application/scvp-cv-response":["scs"],"application/scvp-vp-request":["spq"],"application/scvp-vp-response":["spp"],"application/sdp":["sdp"],"application/senml+xml":["senmlx"],"application/sensml+xml":["sensmlx"],"application/set-payment-initiation":["setpay"],"application/set-registration-initiation":["setreg"],"application/shf+xml":["shf"],"application/sieve":["siv","sieve"],"application/smil+xml":["smi","smil"],"application/sparql-query":["rq"],"application/sparql-results+xml":["srx"],"application/srgs":["gram"],"application/srgs+xml":["grxml"],"application/sru+xml":["sru"],"application/ssdl+xml":["ssdl"],"application/ssml+xml":["ssml"],"application/swid+xml":["swidtag"],"application/tei+xml":["tei","teicorpus"],"application/thraud+xml":["tfi"],"application/timestamped-data":["tsd"],"application/toml":["toml"],"application/ttml+xml":["ttml"],"application/urc-ressheet+xml":["rsheet"],"application/voicexml+xml":["vxml"],"application/wasm":["wasm"],"application/widget":["wgt"],"application/winhlp":["hlp"],"application/wsdl+xml":["wsdl"],"application/wspolicy+xml":["wspolicy"],"application/xaml+xml":["xaml"],"application/xcap-att+xml":["xav"],"application/xcap-caps+xml":["xca"],"application/xcap-diff+xml":["xdf"],"application/xcap-el+xml":["xel"],"application/xcap-error+xml":["xer"],"application/xcap-ns+xml":["xns"],"application/xenc+xml":["xenc"],"application/xhtml+xml":["xhtml","xht"],"application/xliff+xml":["xlf"],"application/xml":["xml","xsl","xsd","rng"],"application/xml-dtd":["dtd"],"application/xop+xml":["xop"],"application/xproc+xml":["xpl"],"application/xslt+xml":["xslt"],"application/xspf+xml":["xspf"],"application/xv+xml":["mxml","xhvml","xvml","xvm"],"application/yang":["yang"],"application/yin+xml":["yin"],"application/zip":["zip"],"audio/3gpp":["*3gpp"],"audio/adpcm":["adp"],"audio/basic":["au","snd"],"audio/midi":["mid","midi","kar","rmi"],"audio/mobile-xmf":["mxmf"],"audio/mp3":["*mp3"],"audio/mp4":["m4a","mp4a"],"audio/mpeg":["mpga","mp2","mp2a","mp3","m2a","m3a"],"audio/ogg":["oga","ogg","spx"],"audio/s3m":["s3m"],"audio/silk":["sil"],"audio/wav":["wav"],"audio/wave":["*wav"],"audio/webm":["weba"],"audio/xm":["xm"],"font/collection":["ttc"],"font/otf":["otf"],"font/ttf":["ttf"],"font/woff":["woff"],"font/woff2":["woff2"],"image/aces":["exr"],"image/apng":["apng"],"image/bmp":["bmp"],"image/cgm":["cgm"],"image/dicom-rle":["drle"],"image/emf":["emf"],"image/fits":["fits"],"image/g3fax":["g3"],"image/gif":["gif"],"image/heic":["heic"],"image/heic-sequence":["heics"],"image/heif":["heif"],"image/heif-sequence":["heifs"],"image/hej2k":["hej2"],"image/hsj2":["hsj2"],"image/ief":["ief"],"image/jls":["jls"],"image/jp2":["jp2","jpg2"],"image/jpeg":["jpeg","jpg","jpe"],"image/jph":["jph"],"image/jphc":["jhc"],"image/jpm":["jpm"],"image/jpx":["jpx","jpf"],"image/jxr":["jxr"],"image/jxra":["jxra"],"image/jxrs":["jxrs"],"image/jxs":["jxs"],"image/jxsc":["jxsc"],"image/jxsi":["jxsi"],"image/jxss":["jxss"],"image/ktx":["ktx"],"image/png":["png"],"image/sgi":["sgi"],"image/svg+xml":["svg","svgz"],"image/t38":["t38"],"image/tiff":["tif","tiff"],"image/tiff-fx":["tfx"],"image/webp":["webp"],"image/wmf":["wmf"],"message/disposition-notification":["disposition-notification"],"message/global":["u8msg"],"message/global-delivery-status":["u8dsn"],"message/global-disposition-notification":["u8mdn"],"message/global-headers":["u8hdr"],"message/rfc822":["eml","mime"],"model/3mf":["3mf"],"model/gltf+json":["gltf"],"model/gltf-binary":["glb"],"model/iges":["igs","iges"],"model/mesh":["msh","mesh","silo"],"model/mtl":["mtl"],"model/obj":["obj"],"model/stl":["stl"],"model/vrml":["wrl","vrml"],"model/x3d+binary":["*x3db","x3dbz"],"model/x3d+fastinfoset":["x3db"],"model/x3d+vrml":["*x3dv","x3dvz"],"model/x3d+xml":["x3d","x3dz"],"model/x3d-vrml":["x3dv"],"text/cache-manifest":["appcache","manifest"],"text/calendar":["ics","ifb"],"text/coffeescript":["coffee","litcoffee"],"text/css":["css"],"text/csv":["csv"],"text/html":["html","htm","shtml"],"text/jade":["jade"],"text/jsx":["jsx"],"text/less":["less"],"text/markdown":["markdown","md"],"text/mathml":["mml"],"text/mdx":["mdx"],"text/n3":["n3"],"text/plain":["txt","text","conf","def","list","log","in","ini"],"text/richtext":["rtx"],"text/rtf":["*rtf"],"text/sgml":["sgml","sgm"],"text/shex":["shex"],"text/slim":["slim","slm"],"text/stylus":["stylus","styl"],"text/tab-separated-values":["tsv"],"text/troff":["t","tr","roff","man","me","ms"],"text/turtle":["ttl"],"text/uri-list":["uri","uris","urls"],"text/vcard":["vcard"],"text/vtt":["vtt"],"text/xml":["*xml"],"text/yaml":["yaml","yml"],"video/3gpp":["3gp","3gpp"],"video/3gpp2":["3g2"],"video/h261":["h261"],"video/h263":["h263"],"video/h264":["h264"],"video/jpeg":["jpgv"],"video/jpm":["*jpm","jpgm"],"video/mj2":["mj2","mjp2"],"video/mp2t":["ts"],"video/mp4":["mp4","mp4v","mpg4"],"video/mpeg":["mpeg","mpg","mpe","m1v","m2v"],"video/ogg":["ogv"],"video/quicktime":["qt","mov"],"video/webm":["webm"]};
+module.exports = {"application/andrew-inset":["ez"],"application/applixware":["aw"],"application/atom+xml":["atom"],"application/atomcat+xml":["atomcat"],"application/atomdeleted+xml":["atomdeleted"],"application/atomsvc+xml":["atomsvc"],"application/atsc-dwd+xml":["dwd"],"application/atsc-held+xml":["held"],"application/atsc-rsat+xml":["rsat"],"application/bdoc":["bdoc"],"application/calendar+xml":["xcs"],"application/ccxml+xml":["ccxml"],"application/cdfx+xml":["cdfx"],"application/cdmi-capability":["cdmia"],"application/cdmi-container":["cdmic"],"application/cdmi-domain":["cdmid"],"application/cdmi-object":["cdmio"],"application/cdmi-queue":["cdmiq"],"application/cu-seeme":["cu"],"application/dash+xml":["mpd"],"application/davmount+xml":["davmount"],"application/docbook+xml":["dbk"],"application/dssc+der":["dssc"],"application/dssc+xml":["xdssc"],"application/ecmascript":["ecma","es"],"application/emma+xml":["emma"],"application/emotionml+xml":["emotionml"],"application/epub+zip":["epub"],"application/exi":["exi"],"application/fdt+xml":["fdt"],"application/font-tdpfr":["pfr"],"application/geo+json":["geojson"],"application/gml+xml":["gml"],"application/gpx+xml":["gpx"],"application/gxf":["gxf"],"application/gzip":["gz"],"application/hjson":["hjson"],"application/hyperstudio":["stk"],"application/inkml+xml":["ink","inkml"],"application/ipfix":["ipfix"],"application/its+xml":["its"],"application/java-archive":["jar","war","ear"],"application/java-serialized-object":["ser"],"application/java-vm":["class"],"application/javascript":["js","mjs"],"application/json":["json","map"],"application/json5":["json5"],"application/jsonml+json":["jsonml"],"application/ld+json":["jsonld"],"application/lgr+xml":["lgr"],"application/lost+xml":["lostxml"],"application/mac-binhex40":["hqx"],"application/mac-compactpro":["cpt"],"application/mads+xml":["mads"],"application/manifest+json":["webmanifest"],"application/marc":["mrc"],"application/marcxml+xml":["mrcx"],"application/mathematica":["ma","nb","mb"],"application/mathml+xml":["mathml"],"application/mbox":["mbox"],"application/mediaservercontrol+xml":["mscml"],"application/metalink+xml":["metalink"],"application/metalink4+xml":["meta4"],"application/mets+xml":["mets"],"application/mmt-aei+xml":["maei"],"application/mmt-usd+xml":["musd"],"application/mods+xml":["mods"],"application/mp21":["m21","mp21"],"application/mp4":["mp4s","m4p"],"application/mrb-consumer+xml":["*xdf"],"application/mrb-publish+xml":["*xdf"],"application/msword":["doc","dot"],"application/mxf":["mxf"],"application/n-quads":["nq"],"application/n-triples":["nt"],"application/node":["cjs"],"application/octet-stream":["bin","dms","lrf","mar","so","dist","distz","pkg","bpk","dump","elc","deploy","exe","dll","deb","dmg","iso","img","msi","msp","msm","buffer"],"application/oda":["oda"],"application/oebps-package+xml":["opf"],"application/ogg":["ogx"],"application/omdoc+xml":["omdoc"],"application/onenote":["onetoc","onetoc2","onetmp","onepkg"],"application/oxps":["oxps"],"application/p2p-overlay+xml":["relo"],"application/patch-ops-error+xml":["*xer"],"application/pdf":["pdf"],"application/pgp-encrypted":["pgp"],"application/pgp-signature":["asc","sig"],"application/pics-rules":["prf"],"application/pkcs10":["p10"],"application/pkcs7-mime":["p7m","p7c"],"application/pkcs7-signature":["p7s"],"application/pkcs8":["p8"],"application/pkix-attr-cert":["ac"],"application/pkix-cert":["cer"],"application/pkix-crl":["crl"],"application/pkix-pkipath":["pkipath"],"application/pkixcmp":["pki"],"application/pls+xml":["pls"],"application/postscript":["ai","eps","ps"],"application/provenance+xml":["provx"],"application/pskc+xml":["pskcxml"],"application/raml+yaml":["raml"],"application/rdf+xml":["rdf","owl"],"application/reginfo+xml":["rif"],"application/relax-ng-compact-syntax":["rnc"],"application/resource-lists+xml":["rl"],"application/resource-lists-diff+xml":["rld"],"application/rls-services+xml":["rs"],"application/route-apd+xml":["rapd"],"application/route-s-tsid+xml":["sls"],"application/route-usd+xml":["rusd"],"application/rpki-ghostbusters":["gbr"],"application/rpki-manifest":["mft"],"application/rpki-roa":["roa"],"application/rsd+xml":["rsd"],"application/rss+xml":["rss"],"application/rtf":["rtf"],"application/sbml+xml":["sbml"],"application/scvp-cv-request":["scq"],"application/scvp-cv-response":["scs"],"application/scvp-vp-request":["spq"],"application/scvp-vp-response":["spp"],"application/sdp":["sdp"],"application/senml+xml":["senmlx"],"application/sensml+xml":["sensmlx"],"application/set-payment-initiation":["setpay"],"application/set-registration-initiation":["setreg"],"application/shf+xml":["shf"],"application/sieve":["siv","sieve"],"application/smil+xml":["smi","smil"],"application/sparql-query":["rq"],"application/sparql-results+xml":["srx"],"application/srgs":["gram"],"application/srgs+xml":["grxml"],"application/sru+xml":["sru"],"application/ssdl+xml":["ssdl"],"application/ssml+xml":["ssml"],"application/swid+xml":["swidtag"],"application/tei+xml":["tei","teicorpus"],"application/thraud+xml":["tfi"],"application/timestamped-data":["tsd"],"application/toml":["toml"],"application/ttml+xml":["ttml"],"application/ubjson":["ubj"],"application/urc-ressheet+xml":["rsheet"],"application/urc-targetdesc+xml":["td"],"application/voicexml+xml":["vxml"],"application/wasm":["wasm"],"application/widget":["wgt"],"application/winhlp":["hlp"],"application/wsdl+xml":["wsdl"],"application/wspolicy+xml":["wspolicy"],"application/xaml+xml":["xaml"],"application/xcap-att+xml":["xav"],"application/xcap-caps+xml":["xca"],"application/xcap-diff+xml":["xdf"],"application/xcap-el+xml":["xel"],"application/xcap-error+xml":["xer"],"application/xcap-ns+xml":["xns"],"application/xenc+xml":["xenc"],"application/xhtml+xml":["xhtml","xht"],"application/xliff+xml":["xlf"],"application/xml":["xml","xsl","xsd","rng"],"application/xml-dtd":["dtd"],"application/xop+xml":["xop"],"application/xproc+xml":["xpl"],"application/xslt+xml":["*xsl","xslt"],"application/xspf+xml":["xspf"],"application/xv+xml":["mxml","xhvml","xvml","xvm"],"application/yang":["yang"],"application/yin+xml":["yin"],"application/zip":["zip"],"audio/3gpp":["*3gpp"],"audio/adpcm":["adp"],"audio/amr":["amr"],"audio/basic":["au","snd"],"audio/midi":["mid","midi","kar","rmi"],"audio/mobile-xmf":["mxmf"],"audio/mp3":["*mp3"],"audio/mp4":["m4a","mp4a"],"audio/mpeg":["mpga","mp2","mp2a","mp3","m2a","m3a"],"audio/ogg":["oga","ogg","spx","opus"],"audio/s3m":["s3m"],"audio/silk":["sil"],"audio/wav":["wav"],"audio/wave":["*wav"],"audio/webm":["weba"],"audio/xm":["xm"],"font/collection":["ttc"],"font/otf":["otf"],"font/ttf":["ttf"],"font/woff":["woff"],"font/woff2":["woff2"],"image/aces":["exr"],"image/apng":["apng"],"image/avif":["avif"],"image/bmp":["bmp"],"image/cgm":["cgm"],"image/dicom-rle":["drle"],"image/emf":["emf"],"image/fits":["fits"],"image/g3fax":["g3"],"image/gif":["gif"],"image/heic":["heic"],"image/heic-sequence":["heics"],"image/heif":["heif"],"image/heif-sequence":["heifs"],"image/hej2k":["hej2"],"image/hsj2":["hsj2"],"image/ief":["ief"],"image/jls":["jls"],"image/jp2":["jp2","jpg2"],"image/jpeg":["jpeg","jpg","jpe"],"image/jph":["jph"],"image/jphc":["jhc"],"image/jpm":["jpm"],"image/jpx":["jpx","jpf"],"image/jxr":["jxr"],"image/jxra":["jxra"],"image/jxrs":["jxrs"],"image/jxs":["jxs"],"image/jxsc":["jxsc"],"image/jxsi":["jxsi"],"image/jxss":["jxss"],"image/ktx":["ktx"],"image/ktx2":["ktx2"],"image/png":["png"],"image/sgi":["sgi"],"image/svg+xml":["svg","svgz"],"image/t38":["t38"],"image/tiff":["tif","tiff"],"image/tiff-fx":["tfx"],"image/webp":["webp"],"image/wmf":["wmf"],"message/disposition-notification":["disposition-notification"],"message/global":["u8msg"],"message/global-delivery-status":["u8dsn"],"message/global-disposition-notification":["u8mdn"],"message/global-headers":["u8hdr"],"message/rfc822":["eml","mime"],"model/3mf":["3mf"],"model/gltf+json":["gltf"],"model/gltf-binary":["glb"],"model/iges":["igs","iges"],"model/mesh":["msh","mesh","silo"],"model/mtl":["mtl"],"model/obj":["obj"],"model/stl":["stl"],"model/vrml":["wrl","vrml"],"model/x3d+binary":["*x3db","x3dbz"],"model/x3d+fastinfoset":["x3db"],"model/x3d+vrml":["*x3dv","x3dvz"],"model/x3d+xml":["x3d","x3dz"],"model/x3d-vrml":["x3dv"],"text/cache-manifest":["appcache","manifest"],"text/calendar":["ics","ifb"],"text/coffeescript":["coffee","litcoffee"],"text/css":["css"],"text/csv":["csv"],"text/html":["html","htm","shtml"],"text/jade":["jade"],"text/jsx":["jsx"],"text/less":["less"],"text/markdown":["markdown","md"],"text/mathml":["mml"],"text/mdx":["mdx"],"text/n3":["n3"],"text/plain":["txt","text","conf","def","list","log","in","ini"],"text/richtext":["rtx"],"text/rtf":["*rtf"],"text/sgml":["sgml","sgm"],"text/shex":["shex"],"text/slim":["slim","slm"],"text/spdx":["spdx"],"text/stylus":["stylus","styl"],"text/tab-separated-values":["tsv"],"text/troff":["t","tr","roff","man","me","ms"],"text/turtle":["ttl"],"text/uri-list":["uri","uris","urls"],"text/vcard":["vcard"],"text/vtt":["vtt"],"text/xml":["*xml"],"text/yaml":["yaml","yml"],"video/3gpp":["3gp","3gpp"],"video/3gpp2":["3g2"],"video/h261":["h261"],"video/h263":["h263"],"video/h264":["h264"],"video/iso.segment":["m4s"],"video/jpeg":["jpgv"],"video/jpm":["*jpm","jpgm"],"video/mj2":["mj2","mjp2"],"video/mp2t":["ts"],"video/mp4":["mp4","mp4v","mpg4"],"video/mpeg":["mpeg","mpg","mpe","m1v","m2v"],"video/ogg":["ogv"],"video/quicktime":["qt","mov"],"video/webm":["webm"]};
 
 /***/ }),
 
@@ -11392,7 +11435,7 @@ const checkCwdOption = (options = {}) => {
 	let stat;
 	try {
 		stat = fs.statSync(options.cwd);
-	} catch (_) {
+	} catch {
 		return;
 	}
 
@@ -11423,7 +11466,7 @@ const generateGlobTasks = (patterns, taskOptions) => {
 
 		const ignore = patterns
 			.slice(index)
-			.filter(isNegative)
+			.filter(pattern => isNegative(pattern))
 			.map(pattern => pattern.slice(1));
 
 		const options = {
@@ -11505,26 +11548,30 @@ module.exports = async (patterns, options) => {
 module.exports.sync = (patterns, options) => {
 	const globTasks = generateGlobTasks(patterns, options);
 
-	const tasks = globTasks.reduce((tasks, task) => {
+	const tasks = [];
+	for (const task of globTasks) {
 		const newTask = getPattern(task, dirGlob.sync).map(globToTask(task));
-		return tasks.concat(newTask);
-	}, []);
+		tasks.push(...newTask);
+	}
 
 	const filter = getFilterSync(options);
 
-	return tasks.reduce(
-		(matches, task) => arrayUnion(matches, fastGlob.sync(task.pattern, task.options)),
-		[]
-	).filter(path_ => !filter(path_));
+	let matches = [];
+	for (const task of tasks) {
+		matches = arrayUnion(matches, fastGlob.sync(task.pattern, task.options));
+	}
+
+	return matches.filter(path_ => !filter(path_));
 };
 
 module.exports.stream = (patterns, options) => {
 	const globTasks = generateGlobTasks(patterns, options);
 
-	const tasks = globTasks.reduce((tasks, task) => {
+	const tasks = [];
+	for (const task of globTasks) {
 		const newTask = getPattern(task, dirGlob.sync).map(globToTask(task));
-		return tasks.concat(newTask);
-	}, []);
+		tasks.push(...newTask);
+	}
 
 	const filter = getFilterSync(options);
 	const filterStream = new FilterStream(p => !filter(p));
@@ -14272,13 +14319,15 @@ const parseGitIgnore = (content, options) => {
 };
 
 const reduceIgnore = files => {
-	return files.reduce((ignores, file) => {
+	const ignores = gitIgnore();
+	for (const file of files) {
 		ignores.add(parseGitIgnore(file.content, {
 			cwd: file.cwd,
 			fileName: file.filePath
 		}));
-		return ignores;
-	}, gitIgnore());
+	}
+
+	return ignores;
 };
 
 const ensureAbsolutePathForCwd = (cwd, p) => {
@@ -14295,7 +14344,7 @@ const ensureAbsolutePathForCwd = (cwd, p) => {
 };
 
 const getIsIgnoredPredecate = (ignores, cwd) => {
-	return p => ignores.ignores(slash(path.relative(cwd, ensureAbsolutePathForCwd(cwd, p))));
+	return p => ignores.ignores(slash(path.relative(cwd, ensureAbsolutePathForCwd(cwd, p.path || p))));
 };
 
 const getFile = async (file, cwd) => {
@@ -15579,7 +15628,7 @@ exports.createTokenAuth = createTokenAuth;
 "use strict";
 
 
-var Mime = __webpack_require__(217);
+let Mime = __webpack_require__(217);
 module.exports = new Mime(__webpack_require__(460));
 
 

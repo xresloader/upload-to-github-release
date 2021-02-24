@@ -42,8 +42,14 @@ inputs:
     description: "If try to update latest release."
     required: false
     default: "false"
+  release_id:
+    description: "Set release id to update.If release_id is set, this step will fail if we can not find it."
+    required: false
+    default: ""
 
 outputs:
+  release_id:
+    description: "The release id"
   release_name:
     description: "The release name"
   release_url:

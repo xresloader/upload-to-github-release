@@ -109,7 +109,17 @@ We will only try to query the first 100 releases to find the draft release with 
 
 **Default** : false
 
+### `release_id`
+
+**Optional** Set release id to update.If release_id is set, this step will fail if we can not find it.
+
+**Default** : 0
+
 ## Outputs
+
+### `release_id`
+
+The release id.
 
 ### `release_name`
 
