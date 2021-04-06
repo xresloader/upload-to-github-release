@@ -7,7 +7,7 @@ import * as fs from "fs";
 import mime from "mime/lite";
 // import Octokit from "@octokit/rest";
 import { env } from "string-env-interpolation";
-import { AsyncReturnType, ValueOf } from "type-fest";
+import { AsyncReturnType, ValueOf, Except } from "type-fest";
 
 // const io = require('@actions/io');
 // const tc = require('@actions/tool-cache');
@@ -525,8 +525,10 @@ async function run() {
 
     // Collect assets to upload
     {
-      const old_asset_map = {};
-      const in_delete_rule = {};
+      type DeployReleaseType = typeof deploy_release;
+      type AssetType = Omit<Omit<Omit<DeployReleaseType, "data">, "assets">, 0>;
+      const old_asset_map: Map<string, AssetType> = new Map<string, AssetType>();
+      const in_delete_rule: Map<string, AssetType> = new Map<string, AssetType>();
 
       if (is_verbose && delete_files_pattern) {
         console.log(
@@ -536,9 +538,10 @@ async function run() {
 
       if (deploy_release && deploy_release.data && deploy_release.data.assets) {
         for (const asset of deploy_release.data.assets) {
-          old_asset_map[asset.name] = asset;
+          const asset_name_lc = asset.name.toLowerCase();
+          old_asset_map.set(asset_name_lc, asset);
           if (delete_files_pattern && micromatch.isMatch(asset.name, delete_files_pattern)) {
-            in_delete_rule[asset.name] = true;
+            in_delete_rule.set(asset_name_lc, asset);
             pending_to_delete.push(asset);
 
             if (is_verbose) {
@@ -552,14 +555,15 @@ async function run() {
 
       for (const file_path of upload_files) {
         const file_base_name = path.basename(file_path);
-        if (old_asset_map[file_base_name]) {
-          if (in_delete_rule[file_base_name]) {
+        const file_base_name_lc = file_base_name.toLowerCase();
+        if (old_asset_map.has(file_base_name_lc)) {
+          if (in_delete_rule.has(file_base_name_lc)) {
             // Already in delete rule, do nothing.
             console.log(
               `Overwrite asset file: ${file_base_name} , because it match ${delete_files_pattern}.`
             );
           } else if (is_overwrite) {
-            pending_to_delete.push(old_asset_map[file_base_name]);
+            pending_to_delete.push(old_asset_map[file_base_name_lc]);
             pending_to_upload.push(file_path);
 
             if (is_verbose) {
