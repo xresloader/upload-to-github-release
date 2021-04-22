@@ -425,6 +425,7 @@ async function run() {
           >,
           "assets"
         >;
+    type AssetType = ValueOf<AssertArrayType, 0>;
     const pending_to_delete: AssertArrayType = [];
     const pending_to_upload: string[] = [];
     var upload_url = "";
@@ -525,8 +526,6 @@ async function run() {
 
     // Collect assets to upload
     {
-      type DeployReleaseType = typeof deploy_release;
-      type AssetType = Omit<Omit<Omit<DeployReleaseType, "data">, "assets">, 0>;
       const old_asset_map: Map<string, AssetType> = new Map<string, AssetType>();
       const in_delete_rule: Map<string, AssetType> = new Map<string, AssetType>();
 
@@ -563,7 +562,10 @@ async function run() {
               `Overwrite asset file: ${file_base_name} , because it match ${delete_files_pattern}.`
             );
           } else if (is_overwrite) {
-            pending_to_delete.push(old_asset_map[file_base_name_lc]);
+            const asset = old_asset_map.get(file_base_name_lc);
+            if (asset) {
+              pending_to_delete.push(asset);
+            }
             pending_to_upload.push(file_path);
 
             if (is_verbose) {
