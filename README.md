@@ -16,7 +16,7 @@ Marketplace: https://github.com/marketplace/actions/upload-to-github-release
 ![Dev dependency: typescript](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/typescript)
 ![Dev dependency: @types/jest](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/@types/jest)
 ![Dev dependency: @types/node](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/@types/node)
-![Dev dependency: @zeit/ncc](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/@zeit/ncc)
+![Dev dependency: @vercel/ncc](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/@vercel/ncc)
 ![Dev dependency: jest](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/jest)
 ![Dev dependency: jest-circus](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/jest-circus)
 ![Dev dependency: ts-jest](https://img.shields.io/github/package-json/dependency-version/xresloader/upload-to-github-release/dev/ts-jest)
@@ -166,6 +166,6 @@ git commit -m "COMMIT MESSAGE"
 
 
 [1]: https://help.github.com/en/articles/virtual-environments-for-github-actions#github_token-secret
-[2]: https://github.com/zeit/ncc
+[2]: https://github.com/vercel/ncc
 [3]: https://www.npmjs.com/
 [4]: https://yarnpkg.com/lang/en/
