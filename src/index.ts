@@ -1,6 +1,6 @@
 import * as action_core from "@actions/core";
 import * as action_github from "@actions/github";
-import globby from "globby";
+import { globby } from "globby";
 import micromatch from 'micromatch';
 import * as path from "path";
 import * as fs from "fs";
@@ -145,7 +145,7 @@ async function run() {
       }
     }
 
-    const upload_files = await globby.globby(upload_files_pattern);
+    const upload_files = await globby(upload_files_pattern);
     if (!upload_files || upload_files.length <= 0) {
       action_core.setFailed(`Can not find any file by ${upload_files_pattern}`);
       return;
