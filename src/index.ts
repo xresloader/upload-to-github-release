@@ -257,7 +257,7 @@ async function run() {
         repo: action_github.context.repo.repo,
         release_id: release_id,
       }).catch((error) => {
-        const message = `Try to get release by id ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`;
+        const message = `Try to get release by id ${release_id} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`;
         console.error(message);
         action_core.setFailed(message);
       });
@@ -265,6 +265,8 @@ async function run() {
       if (!deploy_release) {
         return;
       }
+
+      release_tag_name = deploy_release.data.tag_name;
     }
 
     if (!(deploy_release && deploy_release.data)) {
@@ -322,7 +324,7 @@ async function run() {
     }
     if (deploy_release && deploy_release.headers) {
       console.log(
-        `Get release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status}`
+        `Get release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`
       );
       if (is_verbose) {
         console.log(
