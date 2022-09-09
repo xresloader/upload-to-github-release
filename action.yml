@@ -46,6 +46,14 @@ inputs:
     description: "Set release id to update.If release_id is set, this step will fail if we can not find it."
     required: false
     default: ""
+  target_owner:
+    description: "Set the owner of target repository(default: current user/origanization)."
+    required: false
+    default: ""
+  target_repo:
+    description: "Set target repository(default: current repository)."
+    required: false
+    default: ""
 
 outputs:
   release_id:

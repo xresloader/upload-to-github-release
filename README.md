@@ -115,6 +115,18 @@ We will only try to query the first 100 releases to find the draft release with 
 
 **Default** : 0
 
+### `target_owner`
+
+**Optional** Set the owner of target repository.
+
+**Default** : current user/origanization
+
+### `target_repo`
+
+**Optional** Set target repository.
+
+**Default** : current repository
+
 ## Outputs
 
 ### `release_id`

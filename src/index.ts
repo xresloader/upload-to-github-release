@@ -66,6 +66,8 @@ async function run() {
     const custom_tag_name = getInputAsString("tag_name");
     const update_latest_release = getInputAsBool("update_latest_release");
     var release_id = getInputAsInteger("release_id");
+    var target_owner = getInputAsString("target_owner");
+    var target_repo = getInputAsString("target_owner");
 
     if (typeof github_token != "string") {
       action_core.setFailed("token is invalid");
@@ -75,6 +77,13 @@ async function run() {
     if (!github_token) {
       action_core.setFailed("GITHUB_TOKEN is required to upload files");
       return;
+    }
+
+    if (!target_owner) {
+      target_owner = action_github.context.repo.owner;
+    }
+    if (!target_repo) {
+      target_repo = action_github.context.repo.repo;
     }
 
     // action_github.context.eventName = push
@@ -188,7 +197,7 @@ async function run() {
             }`);
 
         const repo_info_of_release = await octokit.graphql(`query {
-                repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") { 
+                repository (owner:"${target_owner}", name:"${target_repo}") { 
                     release (tagName: "${release_tag_name}") {
                     id,
                     name,
@@ -236,28 +245,28 @@ async function run() {
 
     if (update_latest_release) {
       console.log(
-        `Try to get latest release from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+        `Try to get latest release from ${target_owner}/${target_repo}`
       );
       deploy_release = await octokit.rest.repos.getLatestRelease({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
       }).catch((error) => {
         console.log(
-          `Try to get latest release from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`
+          `Try to get latest release from ${target_owner}/${target_repo} : ${error.message}`
         );
       });
     }
 
     if (release_id != 0 && !(deploy_release && deploy_release.data)) {
       console.log(
-        `Try to get release by id ${release_id} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+        `Try to get release by id ${release_id} from ${target_owner}/${target_repo}`
       );
       deploy_release = await octokit.rest.repos.getRelease({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
         release_id: release_id,
       }).catch((error) => {
-        const message = `Try to get release by id ${release_id} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`;
+        const message = `Try to get release by id ${release_id} from ${target_owner}/${target_repo} : ${error.message}`;
         console.error(message);
         action_core.setFailed(message);
       });
@@ -271,16 +280,16 @@ async function run() {
 
     if (!(deploy_release && deploy_release.data)) {
       console.log(
-        `Try to get release by tag ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+        `Try to get release by tag ${release_tag_name} from ${target_owner}/${target_repo}`
       );
 
       deploy_release = await octokit.rest.repos.getReleaseByTag({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
         tag: release_tag_name,
       }).catch((error) => {
         console.log(
-          `Try to get release by tag ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`
+          `Try to get release by tag ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`
         );
       });
     }
@@ -288,11 +297,11 @@ async function run() {
     // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
     if (!(deploy_release && deploy_release.data) && release_tag_name_has_ref) {
       console.log(
-        `Try to get draft release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+        `Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo}`
       );
       deploy_release = await octokit.rest.repos.listReleases({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
         page: 1,
         per_page: 100,
       }).then((rsp) => {
@@ -312,7 +321,7 @@ async function run() {
         return undefined;
       }).catch((error) => {
         console.log(
-          `Try to get draft release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`
+          `Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`
         );
       });
     }
@@ -324,7 +333,7 @@ async function run() {
     }
     if (deploy_release && deploy_release.headers) {
       console.log(
-        `Get release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`
+        `Get release ${release_tag_name} from ${target_owner}/${target_repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`
       );
       if (is_verbose) {
         console.log(
@@ -347,21 +356,21 @@ async function run() {
         );
       }
       console.log(
-        `Try to get git tags/${release_tag_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+        `Try to get git tags/${release_tag_name} for ${target_owner}/${target_repo}`
       );
       git_tag_ref = await octokit.git.getRef({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
         ref: `tags/${release_tag_name}`,
       });
       console.log(
-        `Get git tags/${release_tag_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success: ${git_tag_ref.data.object.sha}`
+        `Get git tags/${release_tag_name} for ${target_owner}/${target_repo} success: ${git_tag_ref.data.object.sha}`
       );
       if (is_verbose) {
         console.log(`getRef.data = ${JSON.stringify(git_tag_ref.data)}`);
       }
     } catch (error) {
-      var msg = `Get git tags/${release_tag_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}: ${error.message}`;
+      var msg = `Get git tags/${release_tag_name} for ${target_owner}/${target_repo}: ${error.message}`;
       console.log(msg);
     }
 
@@ -378,23 +387,23 @@ async function run() {
             );
           }
           console.log(
-            `Try to update git refs/tags/${release_tag_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} to ${action_github.context.sha}`
+            `Try to update git refs/tags/${release_tag_name} for ${target_owner}/${target_repo} to ${action_github.context.sha}`
           );
           const res = await octokit.git.updateRef({
-            owner: action_github.context.repo.owner,
-            repo: action_github.context.repo.repo,
+            owner: target_owner,
+            repo: target_repo,
             ref: `tags/${release_tag_name}`,
             sha: action_github.context.sha,
             force: true,
           });
           console.log(
-            `Update refs/tags/${release_tag_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`
+            `Update refs/tags/${release_tag_name} for ${target_owner}/${target_repo} success`
           );
           if (is_verbose) {
             console.log(`updateRef.data = ${JSON.stringify(res.data)}`);
           }
         } catch (error) {
-          var msg = `Update git refs/tags/${release_tag_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+          var msg = `Update git refs/tags/${release_tag_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
           msg += `\r\n${error.stack}`;
           console.log(msg);
         }
@@ -445,11 +454,11 @@ async function run() {
         );
       }
       console.log(
-        `Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+        `Try to update release ${release_name} for ${target_owner}/${target_repo}`
       );
       const update_rsp = await octokit.rest.repos.updateRelease({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
         release_id: release_id,
         tag_name: release_tag_name,
         target_commitish: action_github.context.sha,
@@ -458,7 +467,7 @@ async function run() {
         draft: is_draft,
         prerelease: is_prerelease,
       }).catch((error) => {
-        var msg = `Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+        var msg = `Try to update release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
         msg += `\r\n${error.stack}`;
         console.log(msg);
         action_core.setFailed(msg);
@@ -472,7 +481,7 @@ async function run() {
         release_tag_name = deploy_release.data.tag_name;
         release_commitish = deploy_release.data.target_commitish;
         console.log(
-          `Update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`
+          `Update release ${release_name} for ${target_owner}/${target_repo} success`
         );
         if (is_verbose) {
           console.log(
@@ -487,11 +496,11 @@ async function run() {
         );
       }
       console.log(
-        `Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`
+        `Try to create release ${release_name} for ${target_owner}/${target_repo}`
       );
       await octokit.rest.repos.createRelease({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
         tag_name: release_name,
         target_commitish: action_github.context.sha,
         name: release_name,
@@ -506,7 +515,7 @@ async function run() {
         release_id = created_release.data.id;
         release_name = created_release.data.name || "";
         console.log(
-          `Create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`
+          `Create release ${release_name} for ${target_owner}/${target_repo} success`
         );
         if (is_verbose) {
           console.log(
@@ -514,7 +523,7 @@ async function run() {
           );
         }
       }).catch((error) => {
-        var msg = `Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+        var msg = `Try to create release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
         msg += `\r\n${error.stack}`;
         console.log(msg);
         action_core.setFailed(msg);
@@ -591,8 +600,8 @@ async function run() {
       // const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
       console.log(`Deleting old asset: ${asset.name} ...`);
       await octokit.rest.repos.deleteReleaseAsset({
-        owner: action_github.context.repo.owner,
-        repo: action_github.context.repo.repo,
+        owner: target_owner,
+        repo: target_repo,
         asset_id: asset.id,
       }).then((delete_rsp) => {
         if (204 == delete_rsp.status) {
@@ -619,6 +628,12 @@ async function run() {
       const file_size = (file_stats || {}).size || 0;
       const file_base_name = path.basename(file_path);
       const max_retry_times = 3;
+      if (file_size <= 0) {
+        console.log(
+          `Ignore uploading asset ${file_path}(size: ${file_size}).`
+        );
+        continue;
+      }
       var failed_error_msg: string | null = null;
       for (var retry_tims = 0; retry_tims <= max_retry_times; ++retry_tims) {
         const retry_msg = 0 === retry_tims ? "" : `(${retry_tims} retry)`;
@@ -630,10 +645,10 @@ async function run() {
           // Only graphql API(v4) can get bad assets
           if (0 !== retry_tims) {
             console.log(
-              `============================= v4 API: query { repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") } =============================`
+              `============================= v4 API: query { repository (owner:"${target_owner}", name:"${target_repo}") } =============================`
             );
             const repo_info_of_release: any = await octokit.graphql(`query {
-                            repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") { 
+                            repository (owner:"${target_owner}", name:"${target_repo}") { 
                                 release (tagName: "${release_tag_name}") {
                                 id,
                                 name,
@@ -680,8 +695,8 @@ async function run() {
                 );
 
                 const delete_rsp = await octokit.rest.repos.deleteReleaseAsset({
-                  owner: action_github.context.repo.owner,
-                  repo: action_github.context.repo.repo,
+                  owner: target_owner,
+                  repo: target_repo,
                   asset_id: asset_v3_id,
                 });
                 if (204 == delete_rsp.status) {
@@ -723,8 +738,8 @@ async function run() {
             fs.createReadStream(file_path)
           );*/
           const request_params = {
-            owner: action_github.context.repo.owner,
-            repo: action_github.context.repo.repo,
+            owner: target_owner,
+            repo: target_repo,
             release_id: release_id,
             url: upload_url,
             headers: {

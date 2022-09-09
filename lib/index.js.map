@@ -140,6 +140,7 @@ const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
 const os = __importStar(__nccwpck_require__(2037));
 const path = __importStar(__nccwpck_require__(1017));
+const uuid_1 = __nccwpck_require__(5840);
 const oidc_utils_1 = __nccwpck_require__(8041);
 /**
  * The code to exit an action
@@ -169,7 +170,14 @@ function exportVariable(name, val) {
     process.env[name] = convertedVal;
     const filePath = process.env['GITHUB_ENV'] || '';
     if (filePath) {
-        const delimiter = '_GitHubActionsFileCommandDelimeter_';
+        const delimiter = `ghadelimiter_${uuid_1.v4()}`;
+        // These should realistically never happen, but just in case someone finds a way to exploit uuid generation let's not allow keys or values that contain the delimiter.
+        if (name.includes(delimiter)) {
+            throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
+        }
+        if (convertedVal.includes(delimiter)) {
+            throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
+        }
         const commandValue = `${name}<<${delimiter}${os.EOL}${convertedVal}${os.EOL}${delimiter}`;
         file_command_1.issueCommand('ENV', commandValue);
     }
@@ -11176,7 +11184,7 @@ iconv.enableStreamingAPI = function enableStreamingAPI(stream_module) {
         return;
 
     // Dependency-inject stream module to create IconvLite stream classes.
-    var streams = __nccwpck_require__(6409)(stream_module);
+    var streams = __nccwpck_require__(6869)(stream_module);
 
     // Not public API yet, but expose the stream classes.
     iconv.IconvLiteEncoderStream = streams.IconvLiteEncoderStream;
@@ -11215,7 +11223,7 @@ if (false) {}
 
 /***/ }),
 
-/***/ 6409:
+/***/ 6869:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
@@ -17917,6 +17925,652 @@ exports.getUserAgent = getUserAgent;
 
 /***/ }),
 
+/***/ 5840:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+Object.defineProperty(exports, "v1", ({
+  enumerable: true,
+  get: function () {
+    return _v.default;
+  }
+}));
+Object.defineProperty(exports, "v3", ({
+  enumerable: true,
+  get: function () {
+    return _v2.default;
+  }
+}));
+Object.defineProperty(exports, "v4", ({
+  enumerable: true,
+  get: function () {
+    return _v3.default;
+  }
+}));
+Object.defineProperty(exports, "v5", ({
+  enumerable: true,
+  get: function () {
+    return _v4.default;
+  }
+}));
+Object.defineProperty(exports, "NIL", ({
+  enumerable: true,
+  get: function () {
+    return _nil.default;
+  }
+}));
+Object.defineProperty(exports, "version", ({
+  enumerable: true,
+  get: function () {
+    return _version.default;
+  }
+}));
+Object.defineProperty(exports, "validate", ({
+  enumerable: true,
+  get: function () {
+    return _validate.default;
+  }
+}));
+Object.defineProperty(exports, "stringify", ({
+  enumerable: true,
+  get: function () {
+    return _stringify.default;
+  }
+}));
+Object.defineProperty(exports, "parse", ({
+  enumerable: true,
+  get: function () {
+    return _parse.default;
+  }
+}));
+
+var _v = _interopRequireDefault(__nccwpck_require__(8628));
+
+var _v2 = _interopRequireDefault(__nccwpck_require__(6409));
+
+var _v3 = _interopRequireDefault(__nccwpck_require__(5122));
+
+var _v4 = _interopRequireDefault(__nccwpck_require__(9120));
+
+var _nil = _interopRequireDefault(__nccwpck_require__(5332));
+
+var _version = _interopRequireDefault(__nccwpck_require__(1595));
+
+var _validate = _interopRequireDefault(__nccwpck_require__(6900));
+
+var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
+
+var _parse = _interopRequireDefault(__nccwpck_require__(2746));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/***/ }),
+
+/***/ 4569:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _crypto = _interopRequireDefault(__nccwpck_require__(6113));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function md5(bytes) {
+  if (Array.isArray(bytes)) {
+    bytes = Buffer.from(bytes);
+  } else if (typeof bytes === 'string') {
+    bytes = Buffer.from(bytes, 'utf8');
+  }
+
+  return _crypto.default.createHash('md5').update(bytes).digest();
+}
+
+var _default = md5;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 5332:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+var _default = '00000000-0000-0000-0000-000000000000';
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 2746:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _validate = _interopRequireDefault(__nccwpck_require__(6900));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function parse(uuid) {
+  if (!(0, _validate.default)(uuid)) {
+    throw TypeError('Invalid UUID');
+  }
+
+  let v;
+  const arr = new Uint8Array(16); // Parse ########-....-....-....-............
+
+  arr[0] = (v = parseInt(uuid.slice(0, 8), 16)) >>> 24;
+  arr[1] = v >>> 16 & 0xff;
+  arr[2] = v >>> 8 & 0xff;
+  arr[3] = v & 0xff; // Parse ........-####-....-....-............
+
+  arr[4] = (v = parseInt(uuid.slice(9, 13), 16)) >>> 8;
+  arr[5] = v & 0xff; // Parse ........-....-####-....-............
+
+  arr[6] = (v = parseInt(uuid.slice(14, 18), 16)) >>> 8;
+  arr[7] = v & 0xff; // Parse ........-....-....-####-............
+
+  arr[8] = (v = parseInt(uuid.slice(19, 23), 16)) >>> 8;
+  arr[9] = v & 0xff; // Parse ........-....-....-....-############
+  // (Use "/" to avoid 32-bit truncation when bit-shifting high-order bytes)
+
+  arr[10] = (v = parseInt(uuid.slice(24, 36), 16)) / 0x10000000000 & 0xff;
+  arr[11] = v / 0x100000000 & 0xff;
+  arr[12] = v >>> 24 & 0xff;
+  arr[13] = v >>> 16 & 0xff;
+  arr[14] = v >>> 8 & 0xff;
+  arr[15] = v & 0xff;
+  return arr;
+}
+
+var _default = parse;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 814:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+var _default = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 807:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = rng;
+
+var _crypto = _interopRequireDefault(__nccwpck_require__(6113));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+const rnds8Pool = new Uint8Array(256); // # of random values to pre-allocate
+
+let poolPtr = rnds8Pool.length;
+
+function rng() {
+  if (poolPtr > rnds8Pool.length - 16) {
+    _crypto.default.randomFillSync(rnds8Pool);
+
+    poolPtr = 0;
+  }
+
+  return rnds8Pool.slice(poolPtr, poolPtr += 16);
+}
+
+/***/ }),
+
+/***/ 5274:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _crypto = _interopRequireDefault(__nccwpck_require__(6113));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function sha1(bytes) {
+  if (Array.isArray(bytes)) {
+    bytes = Buffer.from(bytes);
+  } else if (typeof bytes === 'string') {
+    bytes = Buffer.from(bytes, 'utf8');
+  }
+
+  return _crypto.default.createHash('sha1').update(bytes).digest();
+}
+
+var _default = sha1;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 8950:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _validate = _interopRequireDefault(__nccwpck_require__(6900));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * Convert array of 16 byte values to UUID string format of the form:
+ * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+ */
+const byteToHex = [];
+
+for (let i = 0; i < 256; ++i) {
+  byteToHex.push((i + 0x100).toString(16).substr(1));
+}
+
+function stringify(arr, offset = 0) {
+  // Note: Be careful editing this code!  It's been tuned for performance
+  // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
+  const uuid = (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase(); // Consistency check for valid UUID.  If this throws, it's likely due to one
+  // of the following:
+  // - One or more input array values don't map to a hex octet (leading to
+  // "undefined" in the uuid)
+  // - Invalid input values for the RFC `version` or `variant` fields
+
+  if (!(0, _validate.default)(uuid)) {
+    throw TypeError('Stringified UUID is invalid');
+  }
+
+  return uuid;
+}
+
+var _default = stringify;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 8628:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _rng = _interopRequireDefault(__nccwpck_require__(807));
+
+var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// **`v1()` - Generate time-based UUID**
+//
+// Inspired by https://github.com/LiosK/UUID.js
+// and http://docs.python.org/library/uuid.html
+let _nodeId;
+
+let _clockseq; // Previous uuid creation time
+
+
+let _lastMSecs = 0;
+let _lastNSecs = 0; // See https://github.com/uuidjs/uuid for API details
+
+function v1(options, buf, offset) {
+  let i = buf && offset || 0;
+  const b = buf || new Array(16);
+  options = options || {};
+  let node = options.node || _nodeId;
+  let clockseq = options.clockseq !== undefined ? options.clockseq : _clockseq; // node and clockseq need to be initialized to random values if they're not
+  // specified.  We do this lazily to minimize issues related to insufficient
+  // system entropy.  See #189
+
+  if (node == null || clockseq == null) {
+    const seedBytes = options.random || (options.rng || _rng.default)();
+
+    if (node == null) {
+      // Per 4.5, create and 48-bit node id, (47 random bits + multicast bit = 1)
+      node = _nodeId = [seedBytes[0] | 0x01, seedBytes[1], seedBytes[2], seedBytes[3], seedBytes[4], seedBytes[5]];
+    }
+
+    if (clockseq == null) {
+      // Per 4.2.2, randomize (14 bit) clockseq
+      clockseq = _clockseq = (seedBytes[6] << 8 | seedBytes[7]) & 0x3fff;
+    }
+  } // UUID timestamps are 100 nano-second units since the Gregorian epoch,
+  // (1582-10-15 00:00).  JSNumbers aren't precise enough for this, so
+  // time is handled internally as 'msecs' (integer milliseconds) and 'nsecs'
+  // (100-nanoseconds offset from msecs) since unix epoch, 1970-01-01 00:00.
+
+
+  let msecs = options.msecs !== undefined ? options.msecs : Date.now(); // Per 4.2.1.2, use count of uuid's generated during the current clock
+  // cycle to simulate higher resolution clock
+
+  let nsecs = options.nsecs !== undefined ? options.nsecs : _lastNSecs + 1; // Time since last uuid creation (in msecs)
+
+  const dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 10000; // Per 4.2.1.2, Bump clockseq on clock regression
+
+  if (dt < 0 && options.clockseq === undefined) {
+    clockseq = clockseq + 1 & 0x3fff;
+  } // Reset nsecs if clock regresses (new clockseq) or we've moved onto a new
+  // time interval
+
+
+  if ((dt < 0 || msecs > _lastMSecs) && options.nsecs === undefined) {
+    nsecs = 0;
+  } // Per 4.2.1.2 Throw error if too many uuids are requested
+
+
+  if (nsecs >= 10000) {
+    throw new Error("uuid.v1(): Can't create more than 10M uuids/sec");
+  }
+
+  _lastMSecs = msecs;
+  _lastNSecs = nsecs;
+  _clockseq = clockseq; // Per 4.1.4 - Convert from unix epoch to Gregorian epoch
+
+  msecs += 12219292800000; // `time_low`
+
+  const tl = ((msecs & 0xfffffff) * 10000 + nsecs) % 0x100000000;
+  b[i++] = tl >>> 24 & 0xff;
+  b[i++] = tl >>> 16 & 0xff;
+  b[i++] = tl >>> 8 & 0xff;
+  b[i++] = tl & 0xff; // `time_mid`
+
+  const tmh = msecs / 0x100000000 * 10000 & 0xfffffff;
+  b[i++] = tmh >>> 8 & 0xff;
+  b[i++] = tmh & 0xff; // `time_high_and_version`
+
+  b[i++] = tmh >>> 24 & 0xf | 0x10; // include version
+
+  b[i++] = tmh >>> 16 & 0xff; // `clock_seq_hi_and_reserved` (Per 4.2.2 - include variant)
+
+  b[i++] = clockseq >>> 8 | 0x80; // `clock_seq_low`
+
+  b[i++] = clockseq & 0xff; // `node`
+
+  for (let n = 0; n < 6; ++n) {
+    b[i + n] = node[n];
+  }
+
+  return buf || (0, _stringify.default)(b);
+}
+
+var _default = v1;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 6409:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _v = _interopRequireDefault(__nccwpck_require__(5998));
+
+var _md = _interopRequireDefault(__nccwpck_require__(4569));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+const v3 = (0, _v.default)('v3', 0x30, _md.default);
+var _default = v3;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 5998:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = _default;
+exports.URL = exports.DNS = void 0;
+
+var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
+
+var _parse = _interopRequireDefault(__nccwpck_require__(2746));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function stringToBytes(str) {
+  str = unescape(encodeURIComponent(str)); // UTF8 escape
+
+  const bytes = [];
+
+  for (let i = 0; i < str.length; ++i) {
+    bytes.push(str.charCodeAt(i));
+  }
+
+  return bytes;
+}
+
+const DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+exports.DNS = DNS;
+const URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
+exports.URL = URL;
+
+function _default(name, version, hashfunc) {
+  function generateUUID(value, namespace, buf, offset) {
+    if (typeof value === 'string') {
+      value = stringToBytes(value);
+    }
+
+    if (typeof namespace === 'string') {
+      namespace = (0, _parse.default)(namespace);
+    }
+
+    if (namespace.length !== 16) {
+      throw TypeError('Namespace must be array-like (16 iterable integer values, 0-255)');
+    } // Compute hash of namespace and value, Per 4.3
+    // Future: Use spread syntax when supported on all platforms, e.g. `bytes =
+    // hashfunc([...namespace, ... value])`
+
+
+    let bytes = new Uint8Array(16 + value.length);
+    bytes.set(namespace);
+    bytes.set(value, namespace.length);
+    bytes = hashfunc(bytes);
+    bytes[6] = bytes[6] & 0x0f | version;
+    bytes[8] = bytes[8] & 0x3f | 0x80;
+
+    if (buf) {
+      offset = offset || 0;
+
+      for (let i = 0; i < 16; ++i) {
+        buf[offset + i] = bytes[i];
+      }
+
+      return buf;
+    }
+
+    return (0, _stringify.default)(bytes);
+  } // Function#name is not settable on some platforms (#270)
+
+
+  try {
+    generateUUID.name = name; // eslint-disable-next-line no-empty
+  } catch (err) {} // For CommonJS default export support
+
+
+  generateUUID.DNS = DNS;
+  generateUUID.URL = URL;
+  return generateUUID;
+}
+
+/***/ }),
+
+/***/ 5122:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _rng = _interopRequireDefault(__nccwpck_require__(807));
+
+var _stringify = _interopRequireDefault(__nccwpck_require__(8950));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function v4(options, buf, offset) {
+  options = options || {};
+
+  const rnds = options.random || (options.rng || _rng.default)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
+
+
+  rnds[6] = rnds[6] & 0x0f | 0x40;
+  rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
+
+  if (buf) {
+    offset = offset || 0;
+
+    for (let i = 0; i < 16; ++i) {
+      buf[offset + i] = rnds[i];
+    }
+
+    return buf;
+  }
+
+  return (0, _stringify.default)(rnds);
+}
+
+var _default = v4;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 9120:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _v = _interopRequireDefault(__nccwpck_require__(5998));
+
+var _sha = _interopRequireDefault(__nccwpck_require__(5274));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+const v5 = (0, _v.default)('v5', 0x50, _sha.default);
+var _default = v5;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 6900:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _regex = _interopRequireDefault(__nccwpck_require__(814));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function validate(uuid) {
+  return typeof uuid === 'string' && _regex.default.test(uuid);
+}
+
+var _default = validate;
+exports["default"] = _default;
+
+/***/ }),
+
+/***/ 1595:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports["default"] = void 0;
+
+var _validate = _interopRequireDefault(__nccwpck_require__(6900));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function version(uuid) {
+  if (!(0, _validate.default)(uuid)) {
+    throw TypeError('Invalid UUID');
+  }
+
+  return parseInt(uuid.substr(14, 1), 16);
+}
+
+var _default = version;
+exports["default"] = _default;
+
+/***/ }),
+
 /***/ 4886:
 /***/ ((module) => {
 
@@ -20011,6 +20665,8 @@ async function run() {
         const custom_tag_name = getInputAsString("tag_name");
         const update_latest_release = getInputAsBool("update_latest_release");
         var release_id = getInputAsInteger("release_id");
+        var target_owner = getInputAsString("target_owner");
+        var target_repo = getInputAsString("target_owner");
         if (typeof github_token != "string") {
             action_core.setFailed("token is invalid");
             return;
@@ -20018,6 +20674,12 @@ async function run() {
         if (!github_token) {
             action_core.setFailed("GITHUB_TOKEN is required to upload files");
             return;
+        }
+        if (!target_owner) {
+            target_owner = action_github.context.repo.owner;
+        }
+        if (!target_repo) {
+            target_repo = action_github.context.repo.repo;
         }
         // action_github.context.eventName = push
         // action_github.context.sha = ae7dc58d20ad51b3c8c37deca1bc07f3ae8526cd
@@ -20089,22 +20751,22 @@ async function run() {
         const octokit = action_github.getOctokit(github_token);
         var deploy_release = undefined;
         if (update_latest_release) {
-            console.log(`Try to get latest release from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            console.log(`Try to get latest release from ${target_owner}/${target_repo}`);
             deploy_release = await octokit.rest.repos.getLatestRelease({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
+                owner: target_owner,
+                repo: target_repo,
             }).catch((error) => {
-                console.log(`Try to get latest release from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+                console.log(`Try to get latest release from ${target_owner}/${target_repo} : ${error.message}`);
             });
         }
         if (release_id != 0 && !(deploy_release && deploy_release.data)) {
-            console.log(`Try to get release by id ${release_id} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            console.log(`Try to get release by id ${release_id} from ${target_owner}/${target_repo}`);
             deploy_release = await octokit.rest.repos.getRelease({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
+                owner: target_owner,
+                repo: target_repo,
                 release_id: release_id,
             }).catch((error) => {
-                const message = `Try to get release by id ${release_id} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`;
+                const message = `Try to get release by id ${release_id} from ${target_owner}/${target_repo} : ${error.message}`;
                 console.error(message);
                 action_core.setFailed(message);
             });
@@ -20114,21 +20776,21 @@ async function run() {
             release_tag_name = deploy_release.data.tag_name;
         }
         if (!(deploy_release && deploy_release.data)) {
-            console.log(`Try to get release by tag ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            console.log(`Try to get release by tag ${release_tag_name} from ${target_owner}/${target_repo}`);
             deploy_release = await octokit.rest.repos.getReleaseByTag({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
+                owner: target_owner,
+                repo: target_repo,
                 tag: release_tag_name,
             }).catch((error) => {
-                console.log(`Try to get release by tag ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+                console.log(`Try to get release by tag ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`);
             });
         }
         // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
         if (!(deploy_release && deploy_release.data) && release_tag_name_has_ref) {
-            console.log(`Try to get draft release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            console.log(`Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo}`);
             deploy_release = await octokit.rest.repos.listReleases({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
+                owner: target_owner,
+                repo: target_repo,
                 page: 1,
                 per_page: 100,
             }).then((rsp) => {
@@ -20144,14 +20806,14 @@ async function run() {
                 }
                 return undefined;
             }).catch((error) => {
-                console.log(`Try to get draft release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${error.message}`);
+                console.log(`Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`);
             });
         }
         if (is_verbose) {
             console.log("============================= v3 API: getReleaseByTag =============================");
         }
         if (deploy_release && deploy_release.headers) {
-            console.log(`Get release ${release_tag_name} from ${action_github.context.repo.owner}/${action_github.context.repo.repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`);
+            console.log(`Get release ${release_tag_name} from ${target_owner}/${target_repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`);
             if (is_verbose) {
                 console.log(`getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`);
             }
@@ -20176,10 +20838,10 @@ async function run() {
             if (is_verbose) {
                 console.log("============================= v3 API: updateRelease =============================");
             }
-            console.log(`Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            console.log(`Try to update release ${release_name} for ${target_owner}/${target_repo}`);
             const update_rsp = await octokit.rest.repos.updateRelease({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
+                owner: target_owner,
+                repo: target_repo,
                 release_id: release_id,
                 tag_name: release_tag_name,
                 target_commitish: action_github.context.sha,
@@ -20188,7 +20850,7 @@ async function run() {
                 draft: is_draft,
                 prerelease: is_prerelease,
             }).catch((error) => {
-                var msg = `Try to update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+                var msg = `Try to update release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
                 msg += `\r\n${error.stack}`;
                 console.log(msg);
                 action_core.setFailed(msg);
@@ -20201,7 +20863,7 @@ async function run() {
                 release_url = deploy_release.data.url;
                 release_tag_name = deploy_release.data.tag_name;
                 release_commitish = deploy_release.data.target_commitish;
-                console.log(`Update release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                console.log(`Update release ${release_name} for ${target_owner}/${target_repo} success`);
                 if (is_verbose) {
                     console.log(`updateRelease.data = ${JSON.stringify(deploy_release.data)}`);
                 }
@@ -20211,10 +20873,10 @@ async function run() {
             if (is_verbose) {
                 console.log("============================= v3 API: createRelease =============================");
             }
-            console.log(`Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo}`);
+            console.log(`Try to create release ${release_name} for ${target_owner}/${target_repo}`);
             await octokit.rest.repos.createRelease({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
+                owner: target_owner,
+                repo: target_repo,
                 tag_name: release_name,
                 target_commitish: action_github.context.sha,
                 name: release_name,
@@ -20228,12 +20890,12 @@ async function run() {
                 release_commitish = created_release.data.target_commitish;
                 release_id = created_release.data.id;
                 release_name = created_release.data.name || "";
-                console.log(`Create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} success`);
+                console.log(`Create release ${release_name} for ${target_owner}/${target_repo} success`);
                 if (is_verbose) {
                     console.log(`createRelease.data = ${JSON.stringify(created_release.data)}`);
                 }
             }).catch((error) => {
-                var msg = `Try to create release ${release_name} for ${action_github.context.repo.owner}/${action_github.context.repo.repo} failed: ${error.message}`;
+                var msg = `Try to create release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
                 msg += `\r\n${error.stack}`;
                 console.log(msg);
                 action_core.setFailed(msg);
@@ -20294,8 +20956,8 @@ async function run() {
             // const pick_id = Buffer.from(asset.id, 'base64').toString().match(/\d+$/); // convert id from graphql v4 api to v3 rest api
             console.log(`Deleting old asset: ${asset.name} ...`);
             await octokit.rest.repos.deleteReleaseAsset({
-                owner: action_github.context.repo.owner,
-                repo: action_github.context.repo.repo,
+                owner: target_owner,
+                repo: target_repo,
                 asset_id: asset.id,
             }).then((delete_rsp) => {
                 if (204 == delete_rsp.status) {
@@ -20318,6 +20980,10 @@ async function run() {
             const file_size = (file_stats || {}).size || 0;
             const file_base_name = path.basename(file_path);
             const max_retry_times = 3;
+            if (file_size <= 0) {
+                console.log(`Ignore uploading asset ${file_path}(size: ${file_size}).`);
+                continue;
+            }
             var failed_error_msg = null;
             for (var retry_tims = 0; retry_tims <= max_retry_times; ++retry_tims) {
                 const retry_msg = 0 === retry_tims ? "" : `(${retry_tims} retry)`;
@@ -20326,9 +20992,9 @@ async function run() {
                     // Maybe upload failed before, try to remove old incompleted file
                     // Only graphql API(v4) can get bad assets
                     if (0 !== retry_tims) {
-                        console.log(`============================= v4 API: query { repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") } =============================`);
+                        console.log(`============================= v4 API: query { repository (owner:"${target_owner}", name:"${target_repo}") } =============================`);
                         const repo_info_of_release = await octokit.graphql(`query {
-                            repository (owner:"${action_github.context.repo.owner}", name:"${action_github.context.repo.repo}") { 
+                            repository (owner:"${target_owner}", name:"${target_repo}") { 
                                 release (tagName: "${release_tag_name}") {
                                 id,
                                 name,
@@ -20365,8 +21031,8 @@ async function run() {
                                 const asset_v3_id = pick_id ? parseInt(pick_id[0]) : 0;
                                 console.log(`Found old asset ${file_base_name}${retry_msg}: deleting id ${asset_v3_id} ...`);
                                 const delete_rsp = await octokit.rest.repos.deleteReleaseAsset({
-                                    owner: action_github.context.repo.owner,
-                                    repo: action_github.context.repo.repo,
+                                    owner: target_owner,
+                                    repo: target_repo,
                                     asset_id: asset_v3_id,
                                 });
                                 if (204 == delete_rsp.status) {
@@ -20400,8 +21066,8 @@ async function run() {
                       fs.createReadStream(file_path)
                     );*/
                     const request_params = {
-                        owner: action_github.context.repo.owner,
-                        repo: action_github.context.repo.repo,
+                        owner: target_owner,
+                        repo: target_repo,
                         release_id: release_id,
                         url: upload_url,
                         headers: {
@@ -20496,6 +21162,14 @@ module.exports = require("assert");
 
 "use strict";
 module.exports = require("buffer");
+
+/***/ }),
+
+/***/ 6113:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("crypto");
 
 /***/ }),
 
