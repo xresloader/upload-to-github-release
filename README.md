@@ -69,7 +69,9 @@ See https://help.github.com/en/articles/creating-a-personal-access-token-for-the
 
 **Optional** The resultant deployment is a draft Release that only repository collaborators can see. This gives you an opportunity to examine and edit the draft release.
 
-**Default** : true
+This is a tristate option. It can be either true or false, which will set the release's status accordingly. When uploading to an existing release, you can also leave this option unset, which will perserve the release's existing status.
+
+**Default** : true for new release, unset for existing release
 
 We will only try to query the first 100 releases to find the draft release with the same name, because we can not get a draft release by tag name util it's published.
 
@@ -77,7 +79,9 @@ We will only try to query the first 100 releases to find the draft release with 
 
 **Optional** The resultant deployment is a Prerelease that only repository collaborators can see. This gives you an opportunity to examine and edit the prerelease.
 
-**Default** : false
+This is a tristate option. It can be either true or false, which will set the release's status accordingly. When uploading to an existing release, you can also leave this option unset, which will perserve the release's existing status.
+
+**Default** : false for new release, unset for existing release
 
 ### `tags`
 
