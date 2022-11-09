@@ -20651,6 +20651,10 @@ function getInputAsBool(name) {
         res != "disable");
 }
 exports.getInputAsBool = getInputAsBool;
+function isInputEmpty(name) {
+    const res = (0, string_env_interpolation_1.env)(action_core.getInput(name) || "").toLowerCase();
+    return res.trim().length == 0;
+}
 function getInputAsString(name) {
     return (0, string_env_interpolation_1.env)(action_core.getInput(name) || "").trim();
 }
@@ -20673,8 +20677,8 @@ async function run() {
         const upload_files_pattern = getInputAsArray("file");
         const delete_files_pattern = getInputAsArray("delete_file");
         const is_overwrite = getInputAsBool("overwrite");
-        const is_draft = getInputAsBool("draft");
-        const is_prerelease = getInputAsBool("prerelease");
+        let is_draft = getInputAsBool("draft");
+        let is_prerelease = getInputAsBool("prerelease");
         const with_tags = getInputAsBool("tags");
         const with_branches = getInputAsArray("branches");
         const is_verbose = getInputAsBool("verbose");
@@ -20790,6 +20794,15 @@ async function run() {
                 return;
             }
             release_tag_name = deploy_release.data.tag_name;
+            if (deploy_release.data.name) {
+                release_name = deploy_release.data.name;
+            }
+            if (isInputEmpty("draft")) {
+                is_draft = deploy_release.data.draft;
+            }
+            if (isInputEmpty("prerelease")) {
+                is_prerelease = deploy_release.data.prerelease;
+            }
         }
         if (!(deploy_release && deploy_release.data)) {
             console.log(`Try to get release by tag ${release_tag_name} from ${target_owner}/${target_repo}`);
@@ -20832,6 +20845,15 @@ async function run() {
             console.log(`Get release ${release_tag_name} from ${target_owner}/${target_repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`);
             if (is_verbose) {
                 console.log(`getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`);
+            }
+            if (deploy_release.data.name) {
+                release_name = deploy_release.data.name;
+            }
+            if (isInputEmpty("draft")) {
+                is_draft = deploy_release.data.draft;
+            }
+            if (isInputEmpty("prerelease")) {
+                is_prerelease = deploy_release.data.prerelease;
             }
         }
         const pending_to_delete = [];
@@ -21134,7 +21156,7 @@ async function run() {
         // Environment sample
         // GITHUB_ACTION=run
         // GITHUB_ACTIONS=true
-        // GITHUB_ACTOR=owt5008137
+        // GITHUB_ACTOR=owent
         // GITHUB_BASE_REF=
         // GITHUB_EVENT_NAME=push
         // GITHUB_EVENT_PATH=/home/runner/work/_temp/_github_workflow/event.json

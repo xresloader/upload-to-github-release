@@ -34,6 +34,11 @@ function getInputAsBool(name: string): boolean {
   );
 }
 
+function isInputEmpty(name: string): boolean {
+  const res = env(action_core.getInput(name) || "").toLowerCase();
+  return res.trim().length == 0;
+}
+
 function getInputAsString(name: string): string {
   return env(action_core.getInput(name) || "").trim();
 }
@@ -58,8 +63,8 @@ async function run() {
     const upload_files_pattern = getInputAsArray("file");
     const delete_files_pattern = getInputAsArray("delete_file");
     const is_overwrite = getInputAsBool("overwrite");
-    const is_draft = getInputAsBool("draft");
-    const is_prerelease = getInputAsBool("prerelease");
+    let is_draft = getInputAsBool("draft");
+    let is_prerelease = getInputAsBool("prerelease");
     const with_tags = getInputAsBool("tags");
     const with_branches = getInputAsArray("branches");
     const is_verbose = getInputAsBool("verbose");
@@ -276,6 +281,15 @@ async function run() {
       }
 
       release_tag_name = deploy_release.data.tag_name;
+      if (deploy_release.data.name) {
+        release_name = deploy_release.data.name;
+      }
+      if (isInputEmpty("draft")) {
+        is_draft = deploy_release.data.draft;
+      }
+      if (isInputEmpty("prerelease")) {
+        is_prerelease = deploy_release.data.prerelease;
+      }
     }
 
     if (!(deploy_release && deploy_release.data)) {
@@ -340,76 +354,17 @@ async function run() {
           `getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`
         );
       }
-    }
 
-    /**
-    // action_github.context.sha will be the tag's commit, it's usual 1 commit above where the tag create from
-    // This will always cause update tag's commit, which is not  what we expect, so we disable to check and update tag here
-    // Check tag references
-    var git_tag_ref:
-      | Octokit.Octokit.Response<Octokit.Octokit.GitGetRefResponse>
-      | undefined = undefined;
-    try {
-      if (is_verbose) {
-        console.log(
-          "============================= v3 API: getRef ============================="
-        );
+      if (deploy_release.data.name) {
+        release_name = deploy_release.data.name;
       }
-      console.log(
-        `Try to get git tags/${release_tag_name} for ${target_owner}/${target_repo}`
-      );
-      git_tag_ref = await octokit.git.getRef({
-        owner: target_owner,
-        repo: target_repo,
-        ref: `tags/${release_tag_name}`,
-      });
-      console.log(
-        `Get git tags/${release_tag_name} for ${target_owner}/${target_repo} success: ${git_tag_ref.data.object.sha}`
-      );
-      if (is_verbose) {
-        console.log(`getRef.data = ${JSON.stringify(git_tag_ref.data)}`);
+      if (isInputEmpty("draft")) {
+        is_draft = deploy_release.data.draft;
       }
-    } catch (error) {
-      var msg = `Get git tags/${release_tag_name} for ${target_owner}/${target_repo}: ${error.message}`;
-      console.log(msg);
-    }
-
-    if (git_tag_ref && git_tag_ref.data) {
-      if (git_tag_ref.data.object.sha == action_github.context.sha) {
-        console.log(
-          `Ignore commit sha of refs/tags/${release_tag_name} because not changed.`
-        );
-      } else {
-        try {
-          if (is_verbose) {
-            console.log(
-              "============================= v3 API: updateRef ============================="
-            );
-          }
-          console.log(
-            `Try to update git refs/tags/${release_tag_name} for ${target_owner}/${target_repo} to ${action_github.context.sha}`
-          );
-          const res = await octokit.git.updateRef({
-            owner: target_owner,
-            repo: target_repo,
-            ref: `tags/${release_tag_name}`,
-            sha: action_github.context.sha,
-            force: true,
-          });
-          console.log(
-            `Update refs/tags/${release_tag_name} for ${target_owner}/${target_repo} success`
-          );
-          if (is_verbose) {
-            console.log(`updateRef.data = ${JSON.stringify(res.data)}`);
-          }
-        } catch (error) {
-          var msg = `Update git refs/tags/${release_tag_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
-          msg += `\r\n${error.stack}`;
-          console.log(msg);
-        }
+      if (isInputEmpty("prerelease")) {
+        is_prerelease = deploy_release.data.prerelease;
       }
     }
-    **/
 
     type AssertArrayType =
       | ValueOf<ValueOf<ValueOf<FakeListReleaseReponse, "data">, 0>, "assets">
@@ -799,7 +754,7 @@ async function run() {
     // Environment sample
     // GITHUB_ACTION=run
     // GITHUB_ACTIONS=true
-    // GITHUB_ACTOR=owt5008137
+    // GITHUB_ACTOR=owent
     // GITHUB_BASE_REF=
     // GITHUB_EVENT_NAME=push
     // GITHUB_EVENT_PATH=/home/runner/work/_temp/_github_workflow/event.json
