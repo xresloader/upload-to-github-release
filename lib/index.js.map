@@ -20639,10 +20639,10 @@ function getInputAsArray(name) {
         .filter((v) => !!v);
 }
 exports.getInputAsArray = getInputAsArray;
-function getInputAsBool(name) {
+function getInputAsBool(name, default_value = false) {
     const res = (0, string_env_interpolation_1.env)(action_core.getInput(name) || "").toLowerCase();
     if (!res) {
-        return false;
+        return default_value;
     }
     return (res != "false" &&
         res != "disabled" &&
@@ -20677,7 +20677,7 @@ async function run() {
         const upload_files_pattern = getInputAsArray("file");
         const delete_files_pattern = getInputAsArray("delete_file");
         const is_overwrite = getInputAsBool("overwrite");
-        let is_draft = getInputAsBool("draft");
+        let is_draft = getInputAsBool("draft", true);
         let is_prerelease = getInputAsBool("prerelease");
         const with_tags = getInputAsBool("tags");
         const with_branches = getInputAsArray("branches");
@@ -20777,11 +20777,20 @@ async function run() {
                 repo: target_repo,
             }).catch((error) => {
                 console.log(`Try to get latest release from ${target_owner}/${target_repo} : ${error.message}`);
+                return undefined;
             });
+            if (deploy_release) {
+                if (is_verbose) {
+                    console.log(`getLatestRelease and the target release = ${JSON.stringify(deploy_release.data)}`);
+                }
+            }
+            else if (is_verbose) {
+                console.log(`Call getLatestRelease but not found`);
+            }
         }
         if (release_id != 0 && !(deploy_release && deploy_release.data)) {
             console.log(`Try to get release by id ${release_id} from ${target_owner}/${target_repo}`);
-            deploy_release = await octokit.rest.repos.getRelease({
+            const release_content_by_id = await octokit.rest.repos.getRelease({
                 owner: target_owner,
                 repo: target_repo,
                 release_id: release_id,
@@ -20790,34 +20799,40 @@ async function run() {
                 console.error(message);
                 action_core.setFailed(message);
             });
-            if (!deploy_release) {
-                return;
+            if (release_content_by_id) {
+                deploy_release = release_content_by_id;
+                if (is_verbose) {
+                    console.log(`getRelease and the target release = ${JSON.stringify(release_content_by_id.data)}`);
+                }
             }
-            release_tag_name = deploy_release.data.tag_name;
-            if (deploy_release.data.name) {
-                release_name = deploy_release.data.name;
-            }
-            if (isInputEmpty("draft")) {
-                is_draft = deploy_release.data.draft;
-            }
-            if (isInputEmpty("prerelease")) {
-                is_prerelease = deploy_release.data.prerelease;
+            else if (is_verbose) {
+                console.log(`Call getRelease but not found`);
             }
         }
         if (!(deploy_release && deploy_release.data)) {
             console.log(`Try to get release by tag ${release_tag_name} from ${target_owner}/${target_repo}`);
-            deploy_release = await octokit.rest.repos.getReleaseByTag({
+            const release_context_by_tag = await octokit.rest.repos.getReleaseByTag({
                 owner: target_owner,
                 repo: target_repo,
                 tag: release_tag_name,
             }).catch((error) => {
                 console.log(`Try to get release by tag ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`);
             });
+            if (release_context_by_tag) {
+                deploy_release = release_context_by_tag;
+                if (is_verbose) {
+                    console.log(`getReleaseByTag and the target release = ${JSON.stringify(release_context_by_tag.data)}`);
+                }
+            }
+            else if (is_verbose) {
+                console.log(`Call getReleaseByTag but not found`);
+            }
         }
         // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
         if (!(deploy_release && deploy_release.data) && release_tag_name_has_ref) {
+            let try_draft_release;
             console.log(`Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo}`);
-            deploy_release = await octokit.rest.repos.listReleases({
+            try_draft_release = await octokit.rest.repos.listReleases({
                 owner: target_owner,
                 repo: target_repo,
                 page: 1,
@@ -20836,16 +20851,21 @@ async function run() {
                 return undefined;
             }).catch((error) => {
                 console.log(`Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`);
+                return undefined;
             });
-        }
-        if (is_verbose) {
-            console.log("============================= v3 API: getReleaseByTag =============================");
-        }
-        if (deploy_release && deploy_release.headers) {
-            console.log(`Get release ${release_tag_name} from ${target_owner}/${target_repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`);
-            if (is_verbose) {
-                console.log(`getReleaseByTag.data = ${JSON.stringify(deploy_release.data)}`);
+            if (try_draft_release && try_draft_release.headers) {
+                deploy_release = try_draft_release;
+                console.log(`Get release ${release_tag_name} from ${target_owner}/${target_repo} : ${deploy_release.headers.status || ("HTTP Code: " + deploy_release.status)}`);
+                if (is_verbose) {
+                    console.log(`listReleases and the target release = ${JSON.stringify(try_draft_release.data)}`);
+                }
             }
+            else if (is_verbose) {
+                console.log(`Call listReleases but no matched release`);
+            }
+        }
+        if (deploy_release && deploy_release.data) {
+            release_tag_name = deploy_release.data.tag_name;
             if (deploy_release.data.name) {
                 release_name = deploy_release.data.name;
             }
