@@ -20674,7 +20674,9 @@ function getInputAsInteger(name) {
 async function run() {
     try {
         const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
-        const upload_files_pattern = getInputAsArray("file");
+        const upload_files_pattern = getInputAsArray("file").map((path) => {
+            return path.replace('\\', '/');
+        });
         const delete_files_pattern = getInputAsArray("delete_file");
         const is_overwrite = getInputAsBool("overwrite");
         let is_draft = getInputAsBool("draft", true);
@@ -21466,7 +21468,7 @@ const getIsIgnoredPredicate = (files, cwd) => {
 	return fileOrDirectory => {
 		fileOrDirectory = toPath(fileOrDirectory);
 		fileOrDirectory = toRelativePath(fileOrDirectory, cwd);
-		return ignores.ignores(slash(fileOrDirectory));
+		return fileOrDirectory ? ignores.ignores(slash(fileOrDirectory)) : false;
 	};
 };
 

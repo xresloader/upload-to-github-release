@@ -60,7 +60,9 @@ export { getInputAsArray, getInputAsBool, getInputAsString };
 async function run() {
   try {
     const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
-    const upload_files_pattern = getInputAsArray("file");
+    const upload_files_pattern = getInputAsArray("file").map((path: string) => {
+      return path.replace('\\', '/');
+    });
     const delete_files_pattern = getInputAsArray("delete_file");
     const is_overwrite = getInputAsBool("overwrite");
     let is_draft = getInputAsBool("draft", true);
