@@ -54,6 +54,10 @@ inputs:
     description: "Set target repository(default: current repository)."
     required: false
     default: ""
+  find_draft_release_count:
+    description: "How many releases to check when we find a existing draft release.(default: 32)."
+    required: false
+    default: "32"
 
 outputs:
   release_id:

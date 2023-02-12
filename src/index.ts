@@ -75,6 +75,7 @@ async function run() {
     var release_id = getInputAsInteger("release_id");
     var target_owner = getInputAsString("target_owner");
     var target_repo = getInputAsString("target_owner");
+    const find_draft_release_count = getInputAsInteger("find_draft_release_count") || 32;
 
     if (typeof github_token != "string") {
       action_core.setFailed("token is invalid");
@@ -104,10 +105,8 @@ async function run() {
 
     var release_tag_name = "Release-" + action_github.context.sha.substring(0, 8);
     var release_name = release_tag_name;
-    var release_tag_name_has_ref = false;
     if (custom_tag_name) {
       release_tag_name = custom_tag_name;
-      release_tag_name_has_ref = true;
     } else if ((with_branches && with_branches.length > 0) || with_tags) {
       // check branches or tags
       var match_filter = false;
@@ -115,7 +114,6 @@ async function run() {
         const match_tag = action_github.context.ref.match(/refs\/tags\/(.*)/);
         if (match_tag) {
           match_filter = true;
-          release_tag_name_has_ref = true;
           release_tag_name = match_tag[1];
           console.log(`Found tag to push: ${match_tag[1]}.`);
         } else {
@@ -335,7 +333,7 @@ async function run() {
     }
 
     // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
-    if (!(deploy_release && deploy_release.data) && release_tag_name_has_ref) {
+    if (!(deploy_release && deploy_release.data)) {
       let try_draft_release: typeof deploy_release;
       console.log(
         `Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo}`
@@ -344,7 +342,7 @@ async function run() {
         owner: target_owner,
         repo: target_repo,
         page: 1,
-        per_page: 100,
+        per_page: find_draft_release_count,
       }).then((rsp) => {
         for (const release of rsp.data || []) {
           if (
