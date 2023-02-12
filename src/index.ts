@@ -135,7 +135,7 @@ async function run() {
             match_filter = true;
             release_tag_name =
               match_branch[1] + "-" + action_github.context.sha.substring(0, 8);
-            console.log("Found branch push: ${match_tag[1]}.");
+            console.log(`Found branch push: ${match_branch[1]}, we will use tag name ${release_tag_name}.`);
           }
         }
 
