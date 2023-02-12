@@ -61,7 +61,7 @@ async function run() {
   try {
     const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
     const upload_files_pattern = getInputAsArray("file").map((path: string) => {
-      return path.replace('\\', '/');
+      return path.replaceAll('\\', '/');
     });
     const delete_files_pattern = getInputAsArray("delete_file");
     const is_overwrite = getInputAsBool("overwrite");
@@ -161,7 +161,18 @@ async function run() {
       }
     }
 
-    const upload_files = await globby(upload_files_pattern);
+    const upload_files: string[] = [];
+    for (const upload_pattern of upload_files_pattern) {
+      const select_files = await globby(upload_pattern, { absolute: true, onlyFiles: true });
+      if (!select_files) {
+        console.warn(`Can not find any file by file pattern ${upload_pattern}.`);
+        continue;
+      }
+      for (const upload_file of select_files) {
+        upload_files.push(upload_file);
+      }
+    }
+
     if (!upload_files || upload_files.length <= 0) {
       action_core.setFailed(`Can not find any file by ${upload_files_pattern}`);
       return;
