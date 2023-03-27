@@ -74,7 +74,8 @@ async function run() {
     const update_latest_release = getInputAsBool("update_latest_release");
     var release_id = getInputAsInteger("release_id");
     var target_owner = getInputAsString("target_owner");
-    var target_repo = getInputAsString("target_owner");
+    let target_repo = getInputAsString("target_repo");
+    let release_name = getInputAsString("default_release_name");
     const find_draft_release_count = getInputAsInteger("find_draft_release_count") || 32;
 
     if (typeof github_token != "string") {
@@ -103,13 +104,15 @@ async function run() {
     // action_github.context.repo.repo = upload-to-github-release-test
     // action_github.context.repo.owner = xresloader
 
-    var release_tag_name = "Release-" + action_github.context.sha.substring(0, 8);
-    var release_name = release_tag_name;
+    let release_tag_name = "Release-" + action_github.context.sha.substring(0, 8);
+    if (!release_name) {
+      release_name = release_tag_name;
+    }
     if (custom_tag_name) {
       release_tag_name = custom_tag_name;
     } else if ((with_branches && with_branches.length > 0) || with_tags) {
       // check branches or tags
-      var match_filter = false;
+      let match_filter = false;
       if (with_tags) {
         const match_tag = action_github.context.ref.match(/refs\/tags\/(.*)/);
         if (match_tag) {
@@ -246,7 +249,7 @@ async function run() {
     type FakeListReleaseReponse = AsyncReturnType<
       typeof octokit.rest.repos.listReleases
     >;
-    var deploy_release: {
+    let deploy_release: {
       data: ValueOf<ValueOf<FakeListReleaseReponse, "data">, 0>;
       status: ValueOf<FakeListReleaseReponse, "status">;
       headers: ValueOf<FakeListReleaseReponse, "headers">;
@@ -417,9 +420,9 @@ async function run() {
     type AssetType = ValueOf<AssertArrayType, 0>;
     const pending_to_delete: AssertArrayType = [];
     const pending_to_upload: string[] = [];
-    var upload_url = "";
-    var release_url = "";
-    var release_commitish = "";
+    let upload_url = "";
+    let release_url = "";
+    let release_commitish = "";
     if (deploy_release && deploy_release.data) {
       upload_url = deploy_release.data.upload_url;
       release_url = deploy_release.data.url;
@@ -450,7 +453,7 @@ async function run() {
         draft: is_draft,
         prerelease: is_prerelease,
       }).catch((error) => {
-        var msg = `Try to update release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
+        let msg = `Try to update release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
         msg += `\r\n${error.stack}`;
         console.log(msg);
         action_core.setFailed(msg);
@@ -506,7 +509,7 @@ async function run() {
           );
         }
       }).catch((error) => {
-        var msg = `Try to create release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
+        let msg = `Try to create release ${release_name} for ${target_owner}/${target_repo} failed: ${error.message}`;
         msg += `\r\n${error.stack}`;
         console.log(msg);
         action_core.setFailed(msg);
@@ -617,7 +620,7 @@ async function run() {
         );
         continue;
       }
-      var failed_error_msg: string | null = null;
+      let failed_error_msg: string | null = null;
       for (var retry_tims = 0; retry_tims <= max_retry_times; ++retry_tims) {
         const retry_msg = 0 === retry_tims ? "" : `(${retry_tims} retry)`;
         try {
