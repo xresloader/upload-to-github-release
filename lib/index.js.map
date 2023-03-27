@@ -20947,7 +20947,7 @@ async function run() {
             await octokit.rest.repos.createRelease({
                 owner: target_owner,
                 repo: target_repo,
-                tag_name: release_name,
+                tag_name: release_tag_name,
                 target_commitish: action_github.context.sha,
                 name: release_name,
                 // body: "",
