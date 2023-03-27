@@ -20714,9 +20714,6 @@ async function run() {
         // action_github.context.repo.repo = upload-to-github-release-test
         // action_github.context.repo.owner = xresloader
         let release_tag_name = "Release-" + action_github.context.sha.substring(0, 8);
-        if (!release_name) {
-            release_name = release_tag_name;
-        }
         if (custom_tag_name) {
             release_tag_name = custom_tag_name;
         }
@@ -20761,6 +20758,9 @@ async function run() {
                 release_tag_name =
                     match_branch[1] + "-" + action_github.context.sha.substring(0, 8);
             }
+        }
+        if (!release_name) {
+            release_name = release_tag_name;
         }
         const upload_files = [];
         for (const upload_pattern of upload_files_pattern) {
@@ -20844,7 +20844,7 @@ async function run() {
         // We can not get a draft release by getReleaseByTag, so we try to find the draft release with the same name by
         if (!(deploy_release && deploy_release.data)) {
             let try_draft_release;
-            console.log(`Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo}`);
+            console.log(`Try to get draft release name ${release_name} or tag name ${release_tag_name} from ${target_owner}/${target_repo}`);
             try_draft_release = await octokit.rest.repos.listReleases({
                 owner: target_owner,
                 repo: target_repo,
@@ -20852,7 +20852,7 @@ async function run() {
                 per_page: find_draft_release_count,
             }).then((rsp) => {
                 for (const release of rsp.data || []) {
-                    if (release.name == release_tag_name ||
+                    if (release.name == release_name ||
                         release.tag_name == release_tag_name) {
                         return {
                             data: release,
@@ -20863,7 +20863,7 @@ async function run() {
                 }
                 return undefined;
             }).catch((error) => {
-                console.log(`Try to get draft release ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`);
+                console.log(`Try to get draft release name ${release_name} or tag name ${release_tag_name} from ${target_owner}/${target_repo} : ${error.message}`);
                 return undefined;
             });
             if (try_draft_release && try_draft_release.headers) {
@@ -20898,11 +20898,10 @@ async function run() {
             upload_url = deploy_release.data.upload_url;
             release_url = deploy_release.data.url;
             release_commitish = deploy_release.data.target_commitish;
-            release_name = deploy_release.data.name || "";
+            if (deploy_release.data.name) {
+                release_name = deploy_release.data.name;
+            }
             release_id = deploy_release.data.id;
-        }
-        else {
-            release_name = release_tag_name;
         }
         // https://developer.github.com/v3/repos/releases/#create-a-release
         if (deploy_release && deploy_release.data) {
