@@ -119,6 +119,12 @@ This is a tristate option. It can be either true or false, which will set the re
 
 **Default** : 0
 
+### `default_release_name`
+
+**Optional** Set release name when create a new release.
+
+**Default** : Git tag name
+
 ### `target_owner`
 
 **Optional** Set the owner of target repository.
