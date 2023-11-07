@@ -59,7 +59,7 @@ export { getInputAsArray, getInputAsBool, getInputAsString };
 
 async function run() {
   try {
-    const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
+    const github_token = (process.env["GITHUB_TOKEN"] || getInputAsString("token") || "").trim();
     const upload_files_pattern = getInputAsArray("file").map((path: string) => {
       return path.replaceAll('\\', '/');
     });
@@ -76,6 +76,7 @@ async function run() {
     var target_owner = getInputAsString("target_owner");
     let target_repo = getInputAsString("target_repo");
     let release_name = getInputAsString("default_release_name");
+    let release_body = getInputAsString("default_release_body");
     const find_draft_release_count = getInputAsInteger("find_draft_release_count") || 32;
 
     if (typeof github_token != "string") {
@@ -86,6 +87,13 @@ async function run() {
     if (!github_token) {
       action_core.setFailed("GITHUB_TOKEN is required to upload files");
       return;
+    }
+
+    if (!release_body) {
+      const release_body_path = getInputAsString("default_release_body");
+      if (release_body_path) {
+        release_body = fs.readFileSync(release_body_path, { encoding: "utf8" });
+      }
     }
 
     if (!target_owner) {
@@ -490,7 +498,7 @@ async function run() {
         tag_name: release_tag_name,
         target_commitish: action_github.context.sha,
         name: release_name,
-        // body: "",
+        body: release_body || undefined,
         draft: is_draft,
         prerelease: is_prerelease,
       }).then((created_release) => {
@@ -718,9 +726,10 @@ async function run() {
           */
 
           const find_mime = mime.getType(path.extname(file_path));
-          const file_data: any = fs.readFileSync(
+          const file_length = fs.statSync(file_path).size;
+          /*const file_data: any = fs.createReadStream(
             file_path
-          ); /*await readableToString(
+          ); /* await readableToString(
             fs.createReadStream(file_path)
           );*/
           const request_params = {
@@ -733,11 +742,11 @@ async function run() {
               // "content-length": file_data.length, // file_size,
             },
             name: file_base_name,
-            data: file_data,
+            data: `@${file_path}`,
           };
           if (is_verbose) {
             console.log(
-              `${retry_msg}uploadReleaseAsset with length: ${file_data.length}`
+              `${retry_msg}uploadReleaseAsset with length: ${file_length}`
             );
           }
           const upload_rsp = await octokit.rest.repos.uploadReleaseAsset(
