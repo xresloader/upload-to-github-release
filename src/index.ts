@@ -718,9 +718,10 @@ async function run() {
           */
 
           const find_mime = mime.getType(path.extname(file_path));
-          const file_data: any = fs.readFileSync(
+          const file_length = fs.statSync(file_path).size;
+          const file_data: any = fs.createReadStream(
             file_path
-          ); /*await readableToString(
+          ); /* await readableToString(
             fs.createReadStream(file_path)
           );*/
           const request_params = {
@@ -730,14 +731,14 @@ async function run() {
             url: upload_url,
             headers: {
               "content-type": find_mime || "application/octet-stream",
-              // "content-length": file_data.length, // file_size,
+              "content-length": file_data.length, // file_size,
             },
             name: file_base_name,
             data: file_data,
           };
           if (is_verbose) {
             console.log(
-              `${retry_msg}uploadReleaseAsset with length: ${file_data.length}`
+              `${retry_msg}uploadReleaseAsset with length: ${file_length}`
             );
           }
           const upload_rsp = await octokit.rest.repos.uploadReleaseAsset(
