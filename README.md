@@ -45,7 +45,7 @@ You can find more samples on https://github.com/xresloader/upload-to-github-rele
 
 ### `GITHUB_TOKEN`
 
-**Required** The github token. You can set it to [`"${{ secrets.GITHUB_TOKEN }}"`][1] to use default token.
+**Optional** The github token. You can set it to [`"${{ secrets.GITHUB_TOKEN }}"`][1] to use default token.
 
 See https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line for details.
 
@@ -124,6 +124,24 @@ This is a tristate option. It can be either true or false, which will set the re
 **Optional** Set release name when create a new release.
 
 **Default** : Git tag name
+
+### `default_release_body`
+
+**Optional** Set release body when create a new release.Not needed if using default_release_body_path.
+
+**Default** : ""
+
+### `default_release_body_path`
+
+**Optional** Set the file to read release body when create a new release.Not needed if using default_release_body.
+
+**Default** : ""
+
+### `token`
+
+**Optional** Authorized secret GitHub Personal Access Token. Defaults to github.token.
+
+**Default** : ${{ github.token }}
 
 ### `target_owner`
 

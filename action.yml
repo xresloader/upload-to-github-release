@@ -50,6 +50,18 @@ inputs:
     description: "Set release name when create a new release."
     required: false
     default: ""
+  default_release_body:
+    description: "Set release body when create a new release.Not needed if using default_release_body_path."
+    required: false
+    default: ""
+  default_release_body_path:
+    description: "Set the file to read release body when create a new release.Not needed if using default_release_body."
+    required: false
+    default: ""
+  token:
+    description: "Authorized secret GitHub Personal Access Token. Defaults to github.token"
+    required: false
+    default: ${{ github.token }}
   target_owner:
     description: "Set the owner of target repository(default: current user/origanization)."
     required: false

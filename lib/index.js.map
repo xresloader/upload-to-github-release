@@ -38752,7 +38752,7 @@ function getInputAsInteger(name) {
 }
 async function run() {
     try {
-        const github_token = (process.env["GITHUB_TOKEN"] || "").trim();
+        const github_token = (process.env["GITHUB_TOKEN"] || getInputAsString("token") || "").trim();
         const upload_files_pattern = getInputAsArray("file").map((path) => {
             return path.replaceAll('\\', '/');
         });
@@ -38769,6 +38769,7 @@ async function run() {
         var target_owner = getInputAsString("target_owner");
         let target_repo = getInputAsString("target_repo");
         let release_name = getInputAsString("default_release_name");
+        let release_body = getInputAsString("default_release_body");
         const find_draft_release_count = getInputAsInteger("find_draft_release_count") || 32;
         if (typeof github_token != "string") {
             action_core.setFailed("token is invalid");
@@ -38777,6 +38778,12 @@ async function run() {
         if (!github_token) {
             action_core.setFailed("GITHUB_TOKEN is required to upload files");
             return;
+        }
+        if (!release_body) {
+            const release_body_path = getInputAsString("default_release_body");
+            if (release_body_path) {
+                release_body = fs.readFileSync(release_body_path, { encoding: "utf8" });
+            }
         }
         if (!target_owner) {
             target_owner = action_github.context.repo.owner;
@@ -39029,7 +39036,7 @@ async function run() {
                 tag_name: release_tag_name,
                 target_commitish: action_github.context.sha,
                 name: release_name,
-                // body: "",
+                body: release_body || undefined,
                 draft: is_draft,
                 prerelease: is_prerelease,
             }).then((created_release) => {
