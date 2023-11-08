@@ -727,7 +727,7 @@ async function run() {
 
           const find_mime = mime.getType(path.extname(file_path));
           const file_length = fs.statSync(file_path).size;
-          const file_data: any = fs.createReadStream(
+          const file_data: any = fs.readFileSync(
             file_path
           ); /* await readableToString(
             fs.createReadStream(file_path)

@@ -39219,7 +39219,7 @@ async function run() {
                     */
                     const find_mime = lite_1.default.getType(path.extname(file_path));
                     const file_length = fs.statSync(file_path).size;
-                    const file_data = fs.createReadStream(file_path); /* await readableToString(
+                    const file_data = fs.readFileSync(file_path); /* await readableToString(
                       fs.createReadStream(file_path)
                     );*/
                     const request_params = {
