@@ -727,7 +727,7 @@ async function run() {
 
           const find_mime = mime.getType(path.extname(file_path));
           const file_length = fs.statSync(file_path).size;
-          /*const file_data: any = fs.createReadStream(
+          const file_data: any = fs.createReadStream(
             file_path
           ); /* await readableToString(
             fs.createReadStream(file_path)
@@ -742,7 +742,7 @@ async function run() {
               // "content-length": file_data.length, // file_size,
             },
             name: file_base_name,
-            data: `@${file_path}`,
+            data: file_data,
           };
           if (is_verbose) {
             console.log(
