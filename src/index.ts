@@ -1,13 +1,13 @@
 import * as action_core from "@actions/core";
 import * as action_github from "@actions/github";
+import { globby } from "globby";
 import micromatch from 'micromatch';
 import * as path from "path";
 import * as fs from "fs";
+import mime from "mime/lite";
 // import Octokit from "@octokit/rest";
 import { env } from "string-env-interpolation";
 import { AsyncReturnType, ValueOf, Except } from "type-fest";
-let mime = import("mime/lite");
-let globby = import("globby");
 
 // const io = require('@actions/io');
 // const tc = require('@actions/tool-cache');
@@ -172,7 +172,7 @@ async function run() {
 
     const upload_files: string[] = [];
     for (const upload_pattern of upload_files_pattern) {
-      const select_files = await (await globby).globby(upload_pattern, { absolute: true, onlyFiles: true });
+      const select_files = await globby(upload_pattern, { absolute: true, onlyFiles: true });
       if (!select_files) {
         console.warn(`Can not find any file by file pattern ${upload_pattern}.`);
         continue;
@@ -617,7 +617,6 @@ async function run() {
         "============================= v3 API: uploadReleaseAsset ============================="
       );
     }
-    let mimeFuncs = await mime;
     for (const file_path of pending_to_upload) {
       const file_stats = fs.statSync(file_path);
       const file_size = (file_stats || {}).size || 0;
@@ -726,7 +725,7 @@ async function run() {
           }
           */
 
-          const find_mime = mimeFuncs.default.getType(path.extname(file_path));
+          const find_mime = mime.getType(path.extname(file_path));
           const file_length = fs.statSync(file_path).size;
           const file_data: any = fs.readFileSync(
             file_path

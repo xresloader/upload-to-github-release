@@ -1,8 +1,8 @@
-const path = require("path");
-const fs = require("fs");
-const ncc = require("@vercel/ncc");
+import * as path from "path";
+import * as fs from "fs";
+import ncc from "@vercel/ncc";
 
-ncc(path.join(__dirname, "src", "index.ts"), {
+ncc(path.join(import.meta.dirname, "src", "index.ts"), {
   // provide a custom cache path or disable caching
   cache: false,
   // externals to leave as requires of the build
@@ -20,7 +20,7 @@ ncc(path.join(__dirname, "src", "index.ts"), {
   quiet: false, // default
   debugLog: false, // default
 }).then(({ code, map, assets }) => {
-  const output_dir = path.join(__dirname, "lib");
+  const output_dir = path.join(import.meta.dirname, "lib");
   fs.mkdir(
     output_dir,
     {

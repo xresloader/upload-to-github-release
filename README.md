@@ -183,12 +183,25 @@ We can use [npm][3] or [yarn][4] to build this action.
 
 ```bash
 npm i -g yarn
-yarn install
-yarn run build
+yarn install # or pnpm install
+yarn run build # or pnpm run build
 
 # commit
 git add lib/* src/*
 git commit -m "COMMIT MESSAGE"
+```
+
+```bash
+# test with bash
+env NODE_OPTIONS="$NODE_OPTIONS --experimental-vm-modules" yarn run test
+env NODE_OPTIONS="$NODE_OPTIONS --experimental-vm-modules" pnpm run test
+```
+
+```powershell
+# test with powershell
+$ENV:NODE_OPTIONS="$ENV:NODE_OPTIONS --experimental-vm-modules"
+
+yarn run test # or pnpm run test
 ```
 
 ### Reference
