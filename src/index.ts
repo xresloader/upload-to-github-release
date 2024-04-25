@@ -4,7 +4,7 @@ import { globby } from "globby";
 import micromatch from 'micromatch';
 import * as path from "path";
 import * as fs from "fs";
-import mime from "mime/lite";
+import * as mime from "mime";
 // import Octokit from "@octokit/rest";
 import { env } from "string-env-interpolation";
 import { AsyncReturnType, ValueOf, Except } from "type-fest";
@@ -76,7 +76,9 @@ async function run() {
     var target_owner = getInputAsString("target_owner");
     let target_repo = getInputAsString("target_repo");
     let release_name = getInputAsString("default_release_name");
-    let release_body = getInputAsString("default_release_body");
+    let default_release_body = getInputAsString("default_release_body");
+    let update_release_body = getInputAsString("update_release_body");
+    const update_release_body_append = getInputAsBool("update_release_body_append");
     const find_draft_release_count = getInputAsInteger("find_draft_release_count") || 32;
 
     if (typeof github_token != "string") {
@@ -89,10 +91,16 @@ async function run() {
       return;
     }
 
-    if (!release_body) {
+    if (!default_release_body) {
       const release_body_path = getInputAsString("default_release_body");
       if (release_body_path) {
-        release_body = fs.readFileSync(release_body_path, { encoding: "utf8" });
+        default_release_body = fs.readFileSync(release_body_path, { encoding: "utf8" });
+      }
+    }
+    if (!update_release_body) {
+      const release_body_path = getInputAsString("update_release_body_path");
+      if (release_body_path) {
+        update_release_body = fs.readFileSync(release_body_path, { encoding: "utf8" });
       }
     }
 
@@ -450,6 +458,16 @@ async function run() {
       console.log(
         `Try to update release ${release_name} for ${target_owner}/${target_repo}`
       );
+      let deploy_release_body;
+      if (update_release_body) {
+        if (update_release_body_append && deploy_release.data.body) {
+          deploy_release_body = deploy_release.data.body.toString() + update_release_body;
+        } else {
+          deploy_release_body = update_release_body;
+        }
+      } else {
+        deploy_release_body = deploy_release.data.body || undefined;
+      }
       const update_rsp = await octokit.rest.repos.updateRelease({
         owner: target_owner,
         repo: target_repo,
@@ -457,7 +475,7 @@ async function run() {
         tag_name: release_tag_name,
         target_commitish: action_github.context.sha,
         name: release_name,
-        body: deploy_release.data.body || undefined,
+        body: deploy_release_body,
         draft: is_draft,
         prerelease: is_prerelease,
       }).catch((error) => {
@@ -498,7 +516,7 @@ async function run() {
         tag_name: release_tag_name,
         target_commitish: action_github.context.sha,
         name: release_name,
-        body: release_body || undefined,
+        body: default_release_body || update_release_body || undefined,
         draft: is_draft,
         prerelease: is_prerelease,
       }).then((created_release) => {
@@ -725,7 +743,7 @@ async function run() {
           }
           */
 
-          const find_mime = mime.getType(path.extname(file_path));
+          const find_mime = mime.default.getType(path.extname(file_path));
           const file_length = fs.statSync(file_path).size;
           const file_data: any = fs.readFileSync(
             file_path

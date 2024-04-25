@@ -33,19 +33,18 @@
     "@actions/github": "^6.0.0",
     "globby": "^14.0.1",
     "micromatch": "^4.0.5",
-    "mime": "^4.0.1",
+    "mime": "^4.0.2",
     "string-env-interpolation": "^1.0.1",
-    "type-fest": "^4.10.2"
+    "type-fest": "^4.17.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
-    "@types/node": "^20.11.19",
+    "@types/node": "^20.12.7",
     "@vercel/ncc": "^0.38.1",
     "jest": "^29.7.0",
     "jest-circus": "^29.7.0",
-    "npm-check-updates": "^16.14.15",
     "ts-jest": "^29.1.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.4.5",
+    "npm-check-updates": "^16.14.18"
   }
 }
