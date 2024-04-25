@@ -137,6 +137,24 @@ This is a tristate option. It can be either true or false, which will set the re
 
 **Default** : ""
 
+### `update_release_body`
+
+**Optional** Always update release body when it's not empty.
+
+**Default** : ""
+
+### `update_release_body_path`
+
+**Optional** Always update release body from file.Not needed if using update_release_body.
+
+**Default** : ""
+
+### `update_release_body_append`
+
+**Optional** Append content instead of replace release body when updating.
+
+**Default** : "false"
+
 ### `token`
 
 **Optional** Authorized secret GitHub Personal Access Token. Defaults to github.token.
