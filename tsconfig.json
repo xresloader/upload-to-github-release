@@ -2,11 +2,11 @@
   "compilerOptions": {
     /* Basic Options */
     // "incremental": true,                   /* Enable incremental compilation */
-    "target": "ES2021",
+    "target": "ES2022",
     /* Specify ECMAScript target version: 'ES3' (default), See https://www.typescriptlang.org/tsconfig#target for more options. */
     // See https://node.green/ for nodejs version and target
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     /* Specify module code generation: See https://www.typescriptlang.org/tsconfig#module for more details. */
     // "allowJs": true,                       /* Allow javascript files to be compiled. */
     // "checkJs": true,                       /* Report errors in .js files. */

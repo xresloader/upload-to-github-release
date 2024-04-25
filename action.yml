@@ -100,7 +100,7 @@ outputs:
     description: "The release commit"
 
 runs:
-  using: "node16"
+  using: "node20"
   main: "lib/index.js"
 
 # env:
