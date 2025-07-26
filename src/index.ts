@@ -575,7 +575,8 @@ async function run() {
         const file_base_name_lc = file_base_name.toLowerCase();
         if (old_asset_map.has(file_base_name_lc)) {
           if (in_delete_rule.has(file_base_name_lc)) {
-            // Already in delete rule, do nothing.
+            // Already in delete rule, add to upload queue.
+            pending_to_upload.push(file_path);
             console.log(
               `Overwrite asset file: ${file_base_name} , because it match ${delete_files_pattern}.`
             );
