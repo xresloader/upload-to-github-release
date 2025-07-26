@@ -3043,7 +3043,7 @@ update-browserslist-db@^1.1.3:
     mime "^4.0.7"
     string-env-interpolation "^1.0.1"
     type-fest "^4.41.0"
-    upload-to-github-release "file:C:/Users/owt50/AppData/Local/Yarn/Cache/v6/npm-upload-to-github-release-1.6.1-26f347c5-7e3d-440b-b564-cd23ad1c711d-1753537379968/node_modules/upload-to-github-release"
+    upload-to-github-release "file:."
 
 v8-to-istanbul@^9.0.1:
   version "9.2.0"
