@@ -579,6 +579,7 @@ async function run() {
             console.log(
               `Overwrite asset file: ${file_base_name} , because it match ${delete_files_pattern}.`
             );
+            pending_to_upload.push(file_path);
           } else if (is_overwrite) {
             const asset = old_asset_map.get(file_base_name_lc);
             if (asset) {
@@ -586,11 +587,9 @@ async function run() {
             }
             pending_to_upload.push(file_path);
 
-            if (is_verbose) {
-              console.log(
-                `Overwrite old asset file: ${file_base_name}.`
-              );
-            }
+            console.log(
+              `Overwrite old asset file: ${file_base_name}.`
+            );
           } else {
             console.log(
               `Skip asset file: ${file_base_name}, it's already existed.`
