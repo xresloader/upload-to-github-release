@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["jest", "node"],
+    "moduleResolution": "bundler",
+    "paths": {
+      "mime/lite": ["./node_modules/mime/dist/src/index_lite.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "__tests__/**/*.ts"]
+}
